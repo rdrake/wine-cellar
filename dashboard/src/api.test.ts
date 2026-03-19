@@ -83,13 +83,13 @@ describe("api.batches", () => {
   });
 
   it("create sends POST with body", async () => {
-    const batch = { name: "Test", wine_type: "red", source_material: "kit", started_at: "2026-01-01T00:00:00Z" };
+    const batch = { name: "Test", wine_type: "red" as const, source_material: "kit" as const, started_at: "2026-01-01T00:00:00Z" };
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 201,
       json: async () => ({ id: "123", ...batch }),
     });
-    await api.batches.create(batch as any);
+    await api.batches.create(batch);
     const [, init] = mockFetch.mock.calls[0];
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body)).toEqual(batch);
