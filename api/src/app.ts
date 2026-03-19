@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { apiKeyAuth } from "./middleware/auth";
 import batches from "./routes/batches";
 import activities from "./routes/activities";
@@ -16,6 +17,14 @@ export type App = Hono<{ Bindings: Bindings }>;
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+app.use(
+  "*",
+  cors({
+    origin: "*",
+    allowHeaders: ["X-API-Key", "X-Webhook-Token", "Content-Type"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  }),
+);
 app.use("*", apiKeyAuth);
 
 app.get("/health", (c) => c.json({ status: "ok" }));
