@@ -3,6 +3,7 @@ import type { Bindings } from "../app";
 import { BatchCreateSchema, BatchUpdateSchema } from "../models";
 import { notFound, conflict, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
+import { WAYPOINT_ORDER } from "../schema";
 
 const batches = new Hono<{ Bindings: Bindings }>();
 
@@ -113,6 +114,85 @@ batches.delete("/:batchId", async (c) => {
 
   await db.prepare("DELETE FROM batches WHERE id = ?").bind(batchId).run();
   return new Response(null, { status: 204 });
+});
+
+// --- Lifecycle Endpoints ---
+
+batches.post("/:batchId/advance", async (c) => {
+  const db = c.env.DB;
+  const batchId = c.req.param("batchId");
+  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  if (!row) return notFound("Batch");
+  if (row.status !== "active") return conflict("Only active batches can advance");
+
+  const currentIdx = WAYPOINT_ORDER.indexOf(row.stage);
+  if (currentIdx >= WAYPOINT_ORDER.length - 1) return conflict("Batch is at final stage");
+
+  const nextStage = WAYPOINT_ORDER[currentIdx + 1];
+  const now = nowUtc();
+  await db.prepare("UPDATE batches SET stage = ?, updated_at = ? WHERE id = ?")
+    .bind(nextStage, now, batchId).run();
+  return c.json(await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first());
+});
+
+async function unassignDevices(db: D1Database, batchId: string, now: string) {
+  await db
+    .prepare("UPDATE devices SET batch_id = NULL, assigned_at = NULL, updated_at = ? WHERE batch_id = ?")
+    .bind(now, batchId).run();
+}
+
+batches.post("/:batchId/complete", async (c) => {
+  const db = c.env.DB;
+  const batchId = c.req.param("batchId");
+  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  if (!row) return notFound("Batch");
+  if (row.status !== "active") return conflict("Only active batches can be completed");
+
+  const now = nowUtc();
+  await db.prepare("UPDATE batches SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ?")
+    .bind(now, now, batchId).run();
+  await unassignDevices(db, batchId, now);
+  return c.json(await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first());
+});
+
+batches.post("/:batchId/abandon", async (c) => {
+  const db = c.env.DB;
+  const batchId = c.req.param("batchId");
+  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  if (!row) return notFound("Batch");
+  if (row.status !== "active") return conflict("Only active batches can be abandoned");
+
+  const now = nowUtc();
+  await db.prepare("UPDATE batches SET status = 'abandoned', updated_at = ? WHERE id = ?")
+    .bind(now, batchId).run();
+  await unassignDevices(db, batchId, now);
+  return c.json(await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first());
+});
+
+batches.post("/:batchId/archive", async (c) => {
+  const db = c.env.DB;
+  const batchId = c.req.param("batchId");
+  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  if (!row) return notFound("Batch");
+  if (row.status !== "completed") return conflict("Only completed batches can be archived");
+
+  const now = nowUtc();
+  await db.prepare("UPDATE batches SET status = 'archived', updated_at = ? WHERE id = ?")
+    .bind(now, batchId).run();
+  return c.json(await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first());
+});
+
+batches.post("/:batchId/unarchive", async (c) => {
+  const db = c.env.DB;
+  const batchId = c.req.param("batchId");
+  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  if (!row) return notFound("Batch");
+  if (row.status !== "archived") return conflict("Only archived batches can be unarchived");
+
+  const now = nowUtc();
+  await db.prepare("UPDATE batches SET status = 'completed', updated_at = ? WHERE id = ?")
+    .bind(now, batchId).run();
+  return c.json(await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first());
 });
 
 export default batches;
