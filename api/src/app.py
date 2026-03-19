@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 
 from src.config import check_api_key
 from src.db import Database
+from src.routes.activities import router as activities_router
 from src.routes.batches import router as batches_router
 
 app = FastAPI(
@@ -46,6 +47,7 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+app.include_router(activities_router)
 app.include_router(batches_router)
 
 
