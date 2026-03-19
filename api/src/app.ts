@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { apiKeyAuth } from "./middleware/auth";
+import batches from "./routes/batches";
 
 export type Bindings = {
   DB: D1Database;
@@ -14,5 +15,6 @@ const app = new Hono<{ Bindings: Bindings }>();
 app.use("*", apiKeyAuth);
 
 app.get("/health", (c) => c.json({ status: "ok" }));
+app.route("/api/v1/batches", batches);
 
 export default app;
