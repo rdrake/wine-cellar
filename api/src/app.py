@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 
 from src.config import check_api_key
 from src.db import Database
+from src.routes.batches import router as batches_router
 
 app = FastAPI(
     title="Wine Cellar API",
@@ -45,15 +46,12 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+app.include_router(batches_router)
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
-
-
-# Stub: will be replaced by router in Task 6
-@app.get("/api/v1/batches")
-async def list_batches_stub() -> dict:
-    return {"items": []}
 
 
 # Cloudflare Worker entrypoint
