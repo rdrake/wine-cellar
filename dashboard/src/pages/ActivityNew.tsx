@@ -127,10 +127,10 @@ export default function ActivityNew() {
   );
 
   const [stage, setStage] = useState<AllStage | "">("");
-  const [type, setType] = useState<ActivityType>("note");
+  const [type, setType] = useState<ActivityType>("measurement");
   const [title, setTitle] = useState("");
   const [recordedAt, setRecordedAt] = useState(new Date().toISOString().slice(0, 16));
-  const [details, setDetails] = useState<Record<string, string>>({});
+  const [details, setDetails] = useState<Record<string, string>>({ metric: "SG", unit: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -221,9 +221,14 @@ export default function ActivityNew() {
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <Button type="submit" className="w-full" disabled={submitting || !stage}>
-          {submitting ? "Saving..." : "Log Activity"}
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={() => navigate(`/batches/${batchId}`)}>
+            Cancel
+          </Button>
+          <Button type="submit" className="flex-1" disabled={submitting || !stage}>
+            {submitting ? "Saving..." : "Log Activity"}
+          </Button>
+        </div>
       </form>
     </div>
   );

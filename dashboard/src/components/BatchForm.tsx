@@ -25,10 +25,11 @@ interface Props {
   /** Hide fields that aren't editable on existing batches */
   editMode?: boolean;
   onSubmit: (data: BatchFormData) => Promise<void>;
+  onCancel?: () => void;
   submitLabel: string;
 }
 
-export default function BatchForm({ initial, editMode, onSubmit, submitLabel }: Props) {
+export default function BatchForm({ initial, editMode, onSubmit, onCancel, submitLabel }: Props) {
   const [form, setForm] = useState<BatchFormData>({
     name: initial?.name ?? "",
     wine_type: initial?.wine_type ?? "red",
@@ -134,9 +135,16 @@ export default function BatchForm({ initial, editMode, onSubmit, submitLabel }: 
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Button type="submit" className="w-full" disabled={submitting}>
-        {submitting ? "Saving..." : submitLabel}
-      </Button>
+      <div className="flex gap-2">
+        {onCancel && (
+          <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" className="flex-1" disabled={submitting}>
+          {submitting ? "Saving..." : submitLabel}
+        </Button>
+      </div>
     </form>
   );
 }

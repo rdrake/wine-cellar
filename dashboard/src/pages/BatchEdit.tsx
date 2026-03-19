@@ -43,6 +43,7 @@ export default function BatchEdit() {
         }}
         editMode
         onSubmit={handleSubmit}
+        onCancel={() => navigate(`/batches/${id}`)}
         submitLabel="Save Changes"
       />
     </div>

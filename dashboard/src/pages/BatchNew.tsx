@@ -22,7 +22,7 @@ export default function BatchNew() {
   return (
     <div className="p-4 max-w-lg mx-auto">
       <h1 className="text-xl font-bold mb-4">New Batch</h1>
-      <BatchForm onSubmit={handleSubmit} submitLabel="Create Batch" />
+      <BatchForm onSubmit={handleSubmit} onCancel={() => navigate("/")} submitLabel="Create Batch" />
     </div>
   );
 }

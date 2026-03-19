@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
@@ -20,7 +20,7 @@ import ActivitySection from "@/components/ActivitySection";
 import ReadingsChart from "@/components/ReadingsChart";
 import DeviceSection from "@/components/DeviceSection";
 
-function LifecycleActions({ batch, onAction }: { batch: Batch; onAction: () => void }) {
+function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onAction: () => void; onDeleted: () => void }) {
   const [confirmAction, setConfirmAction] = useState<{ label: string; action: () => Promise<void> } | null>(null);
   const [acting, setActing] = useState(false);
 
@@ -68,6 +68,26 @@ function LifecycleActions({ batch, onAction }: { batch: Batch; onAction: () => v
             Unarchive
           </Button>
         )}
+        {batch.status !== "active" && (
+          <Button size="sm" variant="destructive" onClick={() => setConfirmAction({
+            label: "Delete batch?",
+            action: async () => {
+              setActing(true);
+              try {
+                await api.batches.delete(batch.id);
+                toast.success("Batch deleted");
+                onDeleted();
+              } catch (e: unknown) {
+                toast.error(e instanceof Error ? e.message : "Delete failed");
+              } finally {
+                setActing(false);
+                setConfirmAction(null);
+              }
+            },
+          })}>
+            Delete
+          </Button>
+        )}
       </div>
 
       <Dialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
@@ -90,6 +110,7 @@ function LifecycleActions({ batch, onAction }: { batch: Batch; onAction: () => v
 
 export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
   const { data: batch, loading, error, refetch } = useFetch(
     () => api.batches.get(id!),
@@ -153,7 +174,7 @@ export default function BatchDetail() {
           </div>
 
           {/* Lifecycle Actions */}
-          <LifecycleActions batch={batch} onAction={refetch} />
+          <LifecycleActions batch={batch} onAction={refetch} onDeleted={() => navigate("/")} />
         </>
       )}
 
