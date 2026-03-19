@@ -8,6 +8,7 @@ from src.routes.batches import router as batches_router
 from src.routes.devices import router as devices_router
 from src.routes.readings import batch_router as batch_readings_router
 from src.routes.readings import device_router as device_readings_router
+from src.routes.webhook import router as webhook_router
 
 app = FastAPI(
     title="Wine Cellar API",
@@ -32,9 +33,7 @@ async def env_middleware(request: Request, call_next):
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    if path in ("/health", "/api/v1/docs", "/api/v1/openapi.json") or path.startswith(
-        "/webhook"
-    ):
+    if path in ("/health", "/api/v1/docs", "/api/v1/openapi.json") or path.startswith("/webhook"):
         return await call_next(request)
     if path.startswith("/api/v1/"):
         api_key = request.headers.get("X-API-Key")
@@ -55,6 +54,7 @@ app.include_router(batches_router)
 app.include_router(devices_router)
 app.include_router(batch_readings_router)
 app.include_router(device_readings_router)
+app.include_router(webhook_router)
 
 
 @app.get("/health")
