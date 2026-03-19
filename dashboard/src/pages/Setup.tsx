@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function Setup() {
   const navigate = useNavigate();
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState("https://wine-cellar-api.rdrake.workers.dev");
   const [key, setKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);

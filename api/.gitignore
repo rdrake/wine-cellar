@@ -2,3 +2,5 @@ node_modules/
 .wrangler/
 .vite/
 dist/
+.env
+.dev.vars
