@@ -92,6 +92,7 @@ export interface BatchUpdate {
   notes?: string | null;
   volume_liters?: number | null;
   target_volume_liters?: number | null;
+  status?: BatchStatus;
 }
 
 export interface ActivityCreate {

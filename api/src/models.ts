@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   WINE_TYPES,
   SOURCE_MATERIALS,
+  BATCH_STATUSES,
   ALL_STAGES,
   ACTIVITY_TYPES,
 } from "./schema";
@@ -24,6 +25,7 @@ export const BatchUpdateSchema = z.object({
   notes: z.string().nullable().optional(),
   volume_liters: z.number().nullable().optional(),
   target_volume_liters: z.number().nullable().optional(),
+  status: z.enum(BATCH_STATUSES).optional(),
 });
 export type BatchUpdate = z.infer<typeof BatchUpdateSchema>;
 

@@ -58,6 +58,11 @@ function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onActi
             </Button>
           </>
         )}
+        {(batch.status === "completed" || batch.status === "abandoned") && (
+          <Button size="sm" variant="outline" onClick={() => doAction("Batch reopened", () => api.batches.update(batch.id, { status: "active" }))}>
+            Reopen
+          </Button>
+        )}
         {batch.status === "completed" && (
           <Button size="sm" variant="outline" onClick={() => doAction("Batch archived", () => api.batches.archive(batch.id))}>
             Archive

@@ -106,6 +106,35 @@ describe("batch lifecycle", () => {
     expect(json.status).toBe("completed");
   });
 
+  it("PATCH status reopens completed batch", async () => {
+    const batchId = await createBatch();
+    await fetchJson(`/api/v1/batches/${batchId}/complete`, { method: "POST", headers: API_HEADERS });
+    const { status, json } = await fetchJson(`/api/v1/batches/${batchId}`, {
+      method: "PATCH", headers: API_HEADERS, body: { status: "active" },
+    });
+    expect(status).toBe(200);
+    expect(json.status).toBe("active");
+    expect(json.completed_at).toBeNull();
+  });
+
+  it("PATCH status reopens abandoned batch", async () => {
+    const batchId = await createBatch();
+    await fetchJson(`/api/v1/batches/${batchId}/abandon`, { method: "POST", headers: API_HEADERS });
+    const { status, json } = await fetchJson(`/api/v1/batches/${batchId}`, {
+      method: "PATCH", headers: API_HEADERS, body: { status: "active" },
+    });
+    expect(status).toBe(200);
+    expect(json.status).toBe("active");
+  });
+
+  it("PATCH rejects invalid status transition", async () => {
+    const batchId = await createBatch();
+    const { status } = await fetchJson(`/api/v1/batches/${batchId}`, {
+      method: "PATCH", headers: API_HEADERS, body: { status: "archived" },
+    });
+    expect(status).toBe(409);
+  });
+
   it("complete unassigns device", async () => {
     const batchId = await createBatch();
     await env.DB.prepare(

@@ -75,13 +75,45 @@ batches.patch("/:batchId", async (c) => {
   const parsed = BatchUpdateSchema.safeParse(body);
   if (!parsed.success) return validationError(parsed.error.issues);
 
-  const allowedCols = ["name", "notes", "volume_liters", "target_volume_liters"] as const;
+  // Validate status transition if requested
+  const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+    active: ["completed", "abandoned"],
+    completed: ["active", "archived"],
+    abandoned: ["active"],
+    archived: ["completed"],
+  };
+
+  if (parsed.data.status !== undefined) {
+    const from = row.status as string;
+    const to = parsed.data.status;
+    if (from === to) {
+      // no-op, ignore
+    } else if (!ALLOWED_TRANSITIONS[from]?.includes(to)) {
+      return conflict(`Cannot change status from ${from} to ${to}`);
+    }
+  }
+
+  const allowedCols = ["name", "notes", "volume_liters", "target_volume_liters", "status"] as const;
   const updates: Record<string, unknown> = {};
   for (const col of allowedCols) {
     if (parsed.data[col] !== undefined) {
       updates[col] = parsed.data[col];
     }
   }
+
+  // If transitioning away from active, unassign devices and set completed_at
+  if (parsed.data.status && parsed.data.status !== "active" && row.status === "active") {
+    const now = nowUtc();
+    await unassignDevices(db, batchId, now);
+    if (parsed.data.status === "completed") {
+      updates.completed_at = now;
+    }
+  }
+  // If reopening, clear completed_at
+  if (parsed.data.status === "active" && row.status !== "active") {
+    updates.completed_at = null;
+  }
+
   if (Object.keys(updates).length === 0) return c.json(row);
 
   updates.updated_at = nowUtc();
