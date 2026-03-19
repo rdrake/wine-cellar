@@ -1,3 +1,148 @@
+import { useState, useCallback } from "react";
+import { api } from "@/api";
+import { useFetch } from "@/hooks/useFetch";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import type { Device, Batch } from "@/types";
+
 export default function Devices() {
-  return <div className="p-4"><h1 className="text-xl font-bold">Devices</h1></div>;
+  const { data: devicesData, loading, error, refetch } = useFetch(
+    () => api.devices.list(),
+    [],
+  );
+  const { data: batchesData } = useFetch(
+    () => api.batches.list(),
+    [],
+  );
+
+  const [assignDialog, setAssignDialog] = useState<Device | null>(null);
+
+  // Build a lookup map for batch names
+  const batchNames = new Map<string, string>();
+  batchesData?.items.forEach((b) => batchNames.set(b.id, b.name));
+
+  return (
+    <div className="p-4 max-w-lg mx-auto">
+      <h1 className="text-xl font-bold mb-4">Devices</h1>
+
+      {loading && <p className="text-muted-foreground text-sm">Loading...</p>}
+      {error && <p className="text-destructive text-sm">{error}</p>}
+
+      {devicesData && devicesData.items.length === 0 && (
+        <p className="text-muted-foreground text-sm py-8 text-center">
+          No devices registered. Devices appear automatically when your RAPT Pill sends its first reading.
+        </p>
+      )}
+
+      <div className="space-y-3">
+        {devicesData?.items.map((device) => (
+          <Card key={device.id}>
+            <CardContent className="p-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-medium">{device.name}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{device.id}</p>
+                  {device.batch_id && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Batch: {batchNames.get(device.batch_id) ?? device.batch_id}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {device.batch_id ? (
+                    <>
+                      <Badge variant="secondary">Assigned</Badge>
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        try {
+                          await api.devices.unassign(device.id);
+                          toast.success("Device unassigned");
+                          refetch();
+                        } catch (e: unknown) {
+                          toast.error(e instanceof Error ? e.message : "Unassign failed");
+                        }
+                      }}>
+                        Unassign
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Badge variant="outline">Unassigned</Badge>
+                      <Button size="sm" variant="outline" onClick={() => setAssignDialog(device)}>
+                        Assign
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {assignDialog && (
+        <AssignDialog
+          device={assignDialog}
+          onClose={() => setAssignDialog(null)}
+          onAssigned={() => { setAssignDialog(null); refetch(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AssignDialog({ device, onClose, onAssigned }: { device: Device; onClose: () => void; onAssigned: () => void }) {
+  const { data: batchesData } = useFetch(
+    useCallback(() => api.batches.list({ status: "active" }), []),
+    [],
+  );
+  const [selectedBatch, setSelectedBatch] = useState("");
+  const [assigning, setAssigning] = useState(false);
+
+  async function handleAssign() {
+    if (!selectedBatch) return;
+    setAssigning(true);
+    try {
+      await api.devices.assign(device.id, selectedBatch);
+      toast.success("Device assigned");
+      onAssigned();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Assignment failed");
+    } finally {
+      setAssigning(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Assign {device.name}</DialogTitle>
+        </DialogHeader>
+        <Select value={selectedBatch} onValueChange={(v) => setSelectedBatch(v ?? "")}>
+          <SelectTrigger><SelectValue placeholder="Select an active batch" /></SelectTrigger>
+          <SelectContent>
+            {batchesData?.items.map((b: Batch) => (
+              <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button disabled={!selectedBatch || assigning} onClick={handleAssign}>
+            {assigning ? "Assigning..." : "Assign"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
