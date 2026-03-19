@@ -6,6 +6,8 @@ from src.db import Database
 from src.routes.activities import router as activities_router
 from src.routes.batches import router as batches_router
 from src.routes.devices import router as devices_router
+from src.routes.readings import batch_router as batch_readings_router
+from src.routes.readings import device_router as device_readings_router
 
 app = FastAPI(
     title="Wine Cellar API",
@@ -51,6 +53,8 @@ async def auth_middleware(request: Request, call_next):
 app.include_router(activities_router)
 app.include_router(batches_router)
 app.include_router(devices_router)
+app.include_router(batch_readings_router)
+app.include_router(device_readings_router)
 
 
 @app.get("/health")
