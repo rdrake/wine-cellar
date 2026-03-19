@@ -1,13 +1,12 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "wine-cellar-api"
-main = "src/app.py"
-compatibility_date = "2025-12-08"
-compatibility_flags = ["python_workers"]
+main = "src/index.ts"
+compatibility_date = "2025-11-02"
 
 [placement]
 mode = "smart"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "wine-cellar"
-database_id = "placeholder-replace-after-d1-create"
+database_name = "wine-cellar-api"
+database_id = "08d5d178-c4f1-4be2-9906-5acea05682ae"
