@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
@@ -6,18 +6,16 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import BatchCard from "@/components/BatchCard";
 import type { BatchStatus } from "@/types";
+import { STATUS_LABELS } from "@/types";
 
-const STATUS_TABS: { value: BatchStatus; label: string }[] = [
-  { value: "active", label: "Active" },
-  { value: "completed", label: "Completed" },
-  { value: "abandoned", label: "Abandoned" },
-  { value: "archived", label: "Archived" },
-];
+const STATUS_TABS = (["active", "completed", "abandoned", "archived"] as const).map(
+  (value) => ({ value, label: STATUS_LABELS[value] }),
+);
 
 export default function BatchList() {
   const [status, setStatus] = useState<BatchStatus>("active");
   const { data, loading, error, refetch } = useFetch(
-    useCallback(() => api.batches.list({ status }), [status]),
+    () => api.batches.list({ status }),
     [status],
   );
 

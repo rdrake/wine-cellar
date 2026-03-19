@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 const tabs = [
   { to: "/", label: "Batches", icon: "🍷" },
@@ -15,9 +16,10 @@ export default function BottomNav() {
             key={tab.to}
             to={tab.to}
             className={({ isActive }) =>
-              `flex flex-col items-center py-3 px-6 text-xs min-w-[72px] transition-colors ${
-                isActive ? "text-primary font-medium" : "text-muted-foreground"
-              }`
+              cn(
+                "flex flex-col items-center py-3 px-6 text-xs min-w-[72px] transition-colors",
+                isActive ? "text-primary font-medium" : "text-muted-foreground",
+              )
             }
           >
             <span className="text-xl mb-0.5">{tab.icon}</span>
