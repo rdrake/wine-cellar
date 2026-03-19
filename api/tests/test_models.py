@@ -25,7 +25,9 @@ def test_batch_create_valid():
 def test_batch_create_invalid_wine_type():
     with pytest.raises(ValidationError):
         BatchCreate(
-            name="Bad", wine_type="beer", source_material="kit",
+            name="Bad",
+            wine_type="beer",
+            source_material="kit",
             started_at="2026-03-19T10:00:00Z",
         )
 

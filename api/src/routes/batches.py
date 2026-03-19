@@ -24,9 +24,16 @@ async def create_batch(body: BatchCreate, request: Request):
             created_at, updated_at)
            VALUES (?, ?, ?, ?, 'must_prep', 'active', ?, ?, ?, ?, ?, ?)""",
         (
-            batch_id, body.name, body.wine_type, body.source_material,
-            body.volume_liters, body.target_volume_liters,
-            body.started_at, body.notes, now, now,
+            batch_id,
+            body.name,
+            body.wine_type,
+            body.source_material,
+            body.volume_liters,
+            body.target_volume_liters,
+            body.started_at,
+            body.notes,
+            now,
+            now,
         ),
     )
     row = await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
@@ -67,9 +74,7 @@ async def list_batches(
 @router.get("/{batch_id}", response_model=BatchResponse)
 async def get_batch(batch_id: str, request: Request):
     db = get_db(request)
-    row = await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    row = await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
     if not row:
         return JSONResponse(
             status_code=404,
@@ -81,20 +86,14 @@ async def get_batch(batch_id: str, request: Request):
 @router.patch("/{batch_id}", response_model=BatchResponse)
 async def update_batch(batch_id: str, body: BatchUpdate, request: Request):
     db = get_db(request)
-    row = await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    row = await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
     if not row:
         return JSONResponse(
             status_code=404,
             content={"error": "not_found", "message": "Batch not found"},
         )
     allowed_cols = {"name", "notes", "volume_liters", "target_volume_liters"}
-    updates = {
-        k: v
-        for k, v in body.model_dump(exclude_unset=True).items()
-        if k in allowed_cols
-    }
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if k in allowed_cols}
     if not updates:
         return row
     updates["updated_at"] = now_utc()
@@ -104,17 +103,13 @@ async def update_batch(batch_id: str, body: BatchUpdate, request: Request):
         f"UPDATE batches SET {set_clause} WHERE id = ?",
         tuple(values),
     )
-    return await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    return await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
 
 
 @router.delete("/{batch_id}", status_code=204)
 async def delete_batch(batch_id: str, request: Request):
     db = get_db(request)
-    row = await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    row = await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
     if not row:
         return JSONResponse(
             status_code=404,
@@ -147,9 +142,7 @@ async def delete_batch(batch_id: str, request: Request):
 @router.post("/{batch_id}/advance", response_model=BatchResponse)
 async def advance_batch(batch_id: str, request: Request):
     db = get_db(request)
-    row = await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    row = await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
     if not row:
         return JSONResponse(
             status_code=404,
@@ -178,17 +171,13 @@ async def advance_batch(batch_id: str, request: Request):
         "UPDATE batches SET stage = ?, updated_at = ? WHERE id = ?",
         (next_stage, now, batch_id),
     )
-    return await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    return await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
 
 
 @router.post("/{batch_id}/complete", response_model=BatchResponse)
 async def complete_batch(batch_id: str, request: Request):
     db = get_db(request)
-    row = await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    row = await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
     if not row:
         return JSONResponse(
             status_code=404,
@@ -204,8 +193,7 @@ async def complete_batch(batch_id: str, request: Request):
         )
     now = now_utc()
     await db.execute(
-        "UPDATE batches SET status = 'completed', "
-        "completed_at = ?, updated_at = ? WHERE id = ?",
+        "UPDATE batches SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ?",
         (now, now, batch_id),
     )
     # Auto-unassign devices
@@ -214,17 +202,13 @@ async def complete_batch(batch_id: str, request: Request):
         "updated_at = ? WHERE batch_id = ?",
         (now, batch_id),
     )
-    return await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    return await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
 
 
 @router.post("/{batch_id}/abandon", response_model=BatchResponse)
 async def abandon_batch(batch_id: str, request: Request):
     db = get_db(request)
-    row = await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    row = await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
     if not row:
         return JSONResponse(
             status_code=404,
@@ -240,8 +224,7 @@ async def abandon_batch(batch_id: str, request: Request):
         )
     now = now_utc()
     await db.execute(
-        "UPDATE batches SET status = 'abandoned', updated_at = ? "
-        "WHERE id = ?",
+        "UPDATE batches SET status = 'abandoned', updated_at = ? WHERE id = ?",
         (now, batch_id),
     )
     await db.execute(
@@ -249,17 +232,13 @@ async def abandon_batch(batch_id: str, request: Request):
         "updated_at = ? WHERE batch_id = ?",
         (now, batch_id),
     )
-    return await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    return await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
 
 
 @router.post("/{batch_id}/archive", response_model=BatchResponse)
 async def archive_batch(batch_id: str, request: Request):
     db = get_db(request)
-    row = await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    row = await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
     if not row:
         return JSONResponse(
             status_code=404,
@@ -275,21 +254,16 @@ async def archive_batch(batch_id: str, request: Request):
         )
     now = now_utc()
     await db.execute(
-        "UPDATE batches SET status = 'archived', updated_at = ? "
-        "WHERE id = ?",
+        "UPDATE batches SET status = 'archived', updated_at = ? WHERE id = ?",
         (now, batch_id),
     )
-    return await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    return await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
 
 
 @router.post("/{batch_id}/unarchive", response_model=BatchResponse)
 async def unarchive_batch(batch_id: str, request: Request):
     db = get_db(request)
-    row = await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    row = await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
     if not row:
         return JSONResponse(
             status_code=404,
@@ -305,10 +279,7 @@ async def unarchive_batch(batch_id: str, request: Request):
         )
     now = now_utc()
     await db.execute(
-        "UPDATE batches SET status = 'completed', updated_at = ? "
-        "WHERE id = ?",
+        "UPDATE batches SET status = 'completed', updated_at = ? WHERE id = ?",
         (now, batch_id),
     )
-    return await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    return await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))

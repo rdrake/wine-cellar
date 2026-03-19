@@ -12,9 +12,10 @@ from src.schema import (
 def test_migration_creates_all_tables():
     conn = sqlite3.connect(":memory:")
     conn.executescript(get_migration_sql())
-    tables = {row[0] for row in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    ).fetchall()}
+    tables = {
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    }
     assert tables >= {"batches", "activities", "readings", "devices"}
     conn.close()
 

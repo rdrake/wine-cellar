@@ -17,9 +17,7 @@ async def _create_batch(client):
 @pytest.mark.asyncio
 async def test_advance_stage(client):
     batch_id = await _create_batch(client)
-    r = await client.post(
-        f"/api/v1/batches/{batch_id}/advance", headers=HEADERS
-    )
+    r = await client.post(f"/api/v1/batches/{batch_id}/advance", headers=HEADERS)
     assert r.status_code == 200
     assert r.json()["stage"] == "primary_fermentation"
 
@@ -34,9 +32,7 @@ async def test_advance_through_all_waypoints(client):
         "bottling",
     ]
     for stage in expected:
-        r = await client.post(
-            f"/api/v1/batches/{batch_id}/advance", headers=HEADERS
-        )
+        r = await client.post(f"/api/v1/batches/{batch_id}/advance", headers=HEADERS)
         assert r.json()["stage"] == stage
 
 
@@ -44,21 +40,15 @@ async def test_advance_through_all_waypoints(client):
 async def test_advance_past_bottling_fails(client):
     batch_id = await _create_batch(client)
     for _ in range(4):
-        await client.post(
-            f"/api/v1/batches/{batch_id}/advance", headers=HEADERS
-        )
-    r = await client.post(
-        f"/api/v1/batches/{batch_id}/advance", headers=HEADERS
-    )
+        await client.post(f"/api/v1/batches/{batch_id}/advance", headers=HEADERS)
+    r = await client.post(f"/api/v1/batches/{batch_id}/advance", headers=HEADERS)
     assert r.status_code == 409
 
 
 @pytest.mark.asyncio
 async def test_complete_batch(client):
     batch_id = await _create_batch(client)
-    r = await client.post(
-        f"/api/v1/batches/{batch_id}/complete", headers=HEADERS
-    )
+    r = await client.post(f"/api/v1/batches/{batch_id}/complete", headers=HEADERS)
     assert r.status_code == 200
     assert r.json()["status"] == "completed"
     assert r.json()["completed_at"] is not None
@@ -67,21 +57,15 @@ async def test_complete_batch(client):
 @pytest.mark.asyncio
 async def test_complete_non_active_fails(client):
     batch_id = await _create_batch(client)
-    await client.post(
-        f"/api/v1/batches/{batch_id}/complete", headers=HEADERS
-    )
-    r = await client.post(
-        f"/api/v1/batches/{batch_id}/complete", headers=HEADERS
-    )
+    await client.post(f"/api/v1/batches/{batch_id}/complete", headers=HEADERS)
+    r = await client.post(f"/api/v1/batches/{batch_id}/complete", headers=HEADERS)
     assert r.status_code == 409
 
 
 @pytest.mark.asyncio
 async def test_abandon_batch(client):
     batch_id = await _create_batch(client)
-    r = await client.post(
-        f"/api/v1/batches/{batch_id}/abandon", headers=HEADERS
-    )
+    r = await client.post(f"/api/v1/batches/{batch_id}/abandon", headers=HEADERS)
     assert r.status_code == 200
     assert r.json()["status"] == "abandoned"
 
@@ -89,24 +73,16 @@ async def test_abandon_batch(client):
 @pytest.mark.asyncio
 async def test_advance_abandoned_fails(client):
     batch_id = await _create_batch(client)
-    await client.post(
-        f"/api/v1/batches/{batch_id}/abandon", headers=HEADERS
-    )
-    r = await client.post(
-        f"/api/v1/batches/{batch_id}/advance", headers=HEADERS
-    )
+    await client.post(f"/api/v1/batches/{batch_id}/abandon", headers=HEADERS)
+    r = await client.post(f"/api/v1/batches/{batch_id}/advance", headers=HEADERS)
     assert r.status_code == 409
 
 
 @pytest.mark.asyncio
 async def test_archive_completed_batch(client):
     batch_id = await _create_batch(client)
-    await client.post(
-        f"/api/v1/batches/{batch_id}/complete", headers=HEADERS
-    )
-    r = await client.post(
-        f"/api/v1/batches/{batch_id}/archive", headers=HEADERS
-    )
+    await client.post(f"/api/v1/batches/{batch_id}/complete", headers=HEADERS)
+    r = await client.post(f"/api/v1/batches/{batch_id}/archive", headers=HEADERS)
     assert r.status_code == 200
     assert r.json()["status"] == "archived"
 
@@ -114,24 +90,16 @@ async def test_archive_completed_batch(client):
 @pytest.mark.asyncio
 async def test_archive_active_fails(client):
     batch_id = await _create_batch(client)
-    r = await client.post(
-        f"/api/v1/batches/{batch_id}/archive", headers=HEADERS
-    )
+    r = await client.post(f"/api/v1/batches/{batch_id}/archive", headers=HEADERS)
     assert r.status_code == 409
 
 
 @pytest.mark.asyncio
 async def test_unarchive_batch(client):
     batch_id = await _create_batch(client)
-    await client.post(
-        f"/api/v1/batches/{batch_id}/complete", headers=HEADERS
-    )
-    await client.post(
-        f"/api/v1/batches/{batch_id}/archive", headers=HEADERS
-    )
-    r = await client.post(
-        f"/api/v1/batches/{batch_id}/unarchive", headers=HEADERS
-    )
+    await client.post(f"/api/v1/batches/{batch_id}/complete", headers=HEADERS)
+    await client.post(f"/api/v1/batches/{batch_id}/archive", headers=HEADERS)
+    r = await client.post(f"/api/v1/batches/{batch_id}/unarchive", headers=HEADERS)
     assert r.status_code == 200
     assert r.json()["status"] == "completed"
 
@@ -154,10 +122,6 @@ async def test_complete_unassigns_device(client, db):
             "2026-01-01T00:00:00Z",
         ),
     )
-    await client.post(
-        f"/api/v1/batches/{batch_id}/complete", headers=HEADERS
-    )
-    device = await db.query_one(
-        "SELECT * FROM devices WHERE id = 'pill-1'"
-    )
+    await client.post(f"/api/v1/batches/{batch_id}/complete", headers=HEADERS)
+    device = await db.query_one("SELECT * FROM devices WHERE id = 'pill-1'")
     assert device["batch_id"] is None

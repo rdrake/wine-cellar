@@ -14,11 +14,20 @@ BATCH_STAGES = (
 )
 
 ALL_STAGES = (
-    "receiving", "crushing", "must_prep",
-    "primary_fermentation", "pressing",
-    "secondary_fermentation", "malolactic",
-    "stabilization", "fining", "bulk_aging", "cold_stabilization", "filtering",
-    "bottling", "bottle_aging",
+    "receiving",
+    "crushing",
+    "must_prep",
+    "primary_fermentation",
+    "pressing",
+    "secondary_fermentation",
+    "malolactic",
+    "stabilization",
+    "fining",
+    "bulk_aging",
+    "cold_stabilization",
+    "filtering",
+    "bottling",
+    "bottle_aging",
 )
 
 WINE_TYPES = ("red", "white", "rosé", "orange", "sparkling", "dessert")

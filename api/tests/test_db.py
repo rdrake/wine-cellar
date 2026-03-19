@@ -20,8 +20,15 @@ async def test_execute_returns_rows(db):
         " started_at, created_at, updated_at)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            "b1", "Test", "red", "kit", "must_prep", "active",
-            "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z",
+            "b1",
+            "Test",
+            "red",
+            "kit",
+            "must_prep",
+            "active",
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:00Z",
         ),
     )
     rows = await db.query("SELECT * FROM batches WHERE id = ?", ("b1",))
@@ -36,8 +43,15 @@ async def test_query_one_returns_dict(db):
         " started_at, created_at, updated_at)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            "b1", "Test", "red", "kit", "must_prep", "active",
-            "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z",
+            "b1",
+            "Test",
+            "red",
+            "kit",
+            "must_prep",
+            "active",
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:00Z",
         ),
     )
     row = await db.query_one("SELECT * FROM batches WHERE id = ?", ("b1",))
@@ -59,8 +73,14 @@ async def test_foreign_keys_enforced(db):
             " recorded_at, created_at, updated_at)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                "a1", "nonexistent", "must_prep", "note", "Test",
-                "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z",
+                "a1",
+                "nonexistent",
+                "must_prep",
+                "note",
+                "Test",
+                "2026-01-01T00:00:00Z",
+                "2026-01-01T00:00:00Z",
+                "2026-01-01T00:00:00Z",
             ),
         )
 
@@ -72,8 +92,15 @@ async def test_execute_or_ignore_dedup(db):
         " started_at, created_at, updated_at)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            "b1", "Test", "red", "kit", "must_prep", "active",
-            "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z",
+            "b1",
+            "Test",
+            "red",
+            "kit",
+            "must_prep",
+            "active",
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:00Z",
         ),
     )
     await db.execute(
@@ -85,8 +112,15 @@ async def test_execute_or_ignore_dedup(db):
         " source_timestamp, created_at)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            "r1", "b1", "d1", 1.05, 22.0, 95.0, -60.0,
-            "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z",
+            "r1",
+            "b1",
+            "d1",
+            1.05,
+            22.0,
+            95.0,
+            -60.0,
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:00Z",
         ),
     )
     assert ok is True
@@ -95,8 +129,15 @@ async def test_execute_or_ignore_dedup(db):
         " source_timestamp, created_at)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            "r2", "b1", "d1", 1.05, 22.0, 95.0, -60.0,
-            "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z",
+            "r2",
+            "b1",
+            "d1",
+            1.05,
+            22.0,
+            95.0,
+            -60.0,
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:00Z",
         ),
     )
     assert dupe is False

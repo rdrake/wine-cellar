@@ -39,9 +39,7 @@ async def create_activity(
     request: Request,
 ):
     db = get_db(request)
-    batch = await db.query_one(
-        "SELECT * FROM batches WHERE id = ?", (batch_id,)
-    )
+    batch = await db.query_one("SELECT * FROM batches WHERE id = ?", (batch_id,))
     if not batch:
         return JSONResponse(
             status_code=404,
@@ -66,8 +64,7 @@ async def create_activity(
             content={
                 "error": "conflict",
                 "message": (
-                    f"Stage '{body.stage}' not allowed "
-                    f"when batch is at '{batch['stage']}'"
+                    f"Stage '{body.stage}' not allowed when batch is at '{batch['stage']}'"
                 ),
             },
         )
@@ -80,13 +77,18 @@ async def create_activity(
             details, recorded_at, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            activity_id, batch_id, body.stage, body.type,
-            body.title, details_json, body.recorded_at, now, now,
+            activity_id,
+            batch_id,
+            body.stage,
+            body.type,
+            body.title,
+            details_json,
+            body.recorded_at,
+            now,
+            now,
         ),
     )
-    row = await db.query_one(
-        "SELECT * FROM activities WHERE id = ?", (activity_id,)
-    )
+    row = await db.query_one("SELECT * FROM activities WHERE id = ?", (activity_id,))
     row["details"] = _deserialize_details(row["details"])
     return row
 
@@ -101,9 +103,7 @@ async def list_activities(
     end_time: str | None = None,
 ):
     db = get_db(request)
-    batch = await db.query_one(
-        "SELECT id FROM batches WHERE id = ?", (batch_id,)
-    )
+    batch = await db.query_one("SELECT id FROM batches WHERE id = ?", (batch_id,))
     if not batch:
         return JSONResponse(
             status_code=404,
@@ -169,9 +169,7 @@ async def update_activity(
         f"UPDATE activities SET {set_clause} WHERE id = ?",
         tuple(values),
     )
-    row = await db.query_one(
-        "SELECT * FROM activities WHERE id = ?", (activity_id,)
-    )
+    row = await db.query_one("SELECT * FROM activities WHERE id = ?", (activity_id,))
     row["details"] = _deserialize_details(row["details"])
     return row
 
@@ -195,7 +193,5 @@ async def delete_activity(
                 "message": "Activity not found",
             },
         )
-    await db.execute(
-        "DELETE FROM activities WHERE id = ?", (activity_id,)
-    )
+    await db.execute("DELETE FROM activities WHERE id = ?", (activity_id,))
     return None

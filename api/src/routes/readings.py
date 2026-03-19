@@ -55,10 +55,7 @@ async def _paginated_query(
         decoded = _decode_cursor(cursor)
         if decoded:
             ts, rid = decoded
-            sql += (
-                " AND (source_timestamp < ?"
-                " OR (source_timestamp = ? AND id < ?))"
-            )
+            sql += " AND (source_timestamp < ? OR (source_timestamp = ? AND id < ?))"
             params.extend([ts, ts, rid])
     sql += " ORDER BY source_timestamp DESC, id DESC LIMIT ?"
     params.append(limit + 1)  # fetch one extra to detect next page
@@ -68,9 +65,7 @@ async def _paginated_query(
     next_cursor = None
     if has_next and items:
         last = items[-1]
-        next_cursor = _encode_cursor(
-            last["source_timestamp"], last["id"]
-        )
+        next_cursor = _encode_cursor(last["source_timestamp"], last["id"])
     return {"items": items, "next_cursor": next_cursor}
 
 
@@ -84,9 +79,7 @@ async def list_readings_by_batch(
     end_time: str | None = None,
 ):
     db = get_db(request)
-    batch = await db.query_one(
-        "SELECT id FROM batches WHERE id = ?", (batch_id,)
-    )
+    batch = await db.query_one("SELECT id FROM batches WHERE id = ?", (batch_id,))
     if not batch:
         return JSONResponse(
             status_code=404,
@@ -117,9 +110,7 @@ async def list_readings_by_device(
     end_time: str | None = None,
 ):
     db = get_db(request)
-    device = await db.query_one(
-        "SELECT id FROM devices WHERE id = ?", (device_id,)
-    )
+    device = await db.query_one("SELECT id FROM devices WHERE id = ?", (device_id,))
     if not device:
         return JSONResponse(
             status_code=404,

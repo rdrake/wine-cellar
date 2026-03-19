@@ -77,9 +77,7 @@ async def test_assign_device(client):
 @pytest.mark.asyncio
 async def test_assign_to_non_active_batch_fails(client):
     batch_id = await _create_batch(client)
-    await client.post(
-        f"/api/v1/batches/{batch_id}/complete", headers=HEADERS
-    )
+    await client.post(f"/api/v1/batches/{batch_id}/complete", headers=HEADERS)
     await client.post(
         "/api/v1/devices",
         json={"id": "pill-1", "name": "My Pill"},
@@ -126,8 +124,15 @@ async def test_assign_backfills_readings(client, db):
         "source_timestamp, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            "r1", None, "pill-1", 1.090, 22.0, 95.0, -60.0,
-            "2026-03-18T10:00:00Z", "2026-03-18T10:00:00Z",
+            "r1",
+            None,
+            "pill-1",
+            1.090,
+            22.0,
+            95.0,
+            -60.0,
+            "2026-03-18T10:00:00Z",
+            "2026-03-18T10:00:00Z",
         ),
     )
     await db.execute(
@@ -136,8 +141,15 @@ async def test_assign_backfills_readings(client, db):
         "source_timestamp, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            "r2", None, "pill-1", 1.088, 22.5, 94.0, -62.0,
-            "2026-03-19T12:00:00Z", "2026-03-19T12:00:00Z",
+            "r2",
+            None,
+            "pill-1",
+            1.088,
+            22.5,
+            94.0,
+            -62.0,
+            "2026-03-19T12:00:00Z",
+            "2026-03-19T12:00:00Z",
         ),
     )
     await client.post(
@@ -146,12 +158,8 @@ async def test_assign_backfills_readings(client, db):
         headers=HEADERS,
     )
     # r1 is before started_at, should remain unassigned
-    r1 = await db.query_one(
-        "SELECT batch_id FROM readings WHERE id = 'r1'"
-    )
+    r1 = await db.query_one("SELECT batch_id FROM readings WHERE id = 'r1'")
     assert r1["batch_id"] is None
     # r2 is after started_at, should be backfilled
-    r2 = await db.query_one(
-        "SELECT batch_id FROM readings WHERE id = 'r2'"
-    )
+    r2 = await db.query_one("SELECT batch_id FROM readings WHERE id = 'r2'")
     assert r2["batch_id"] == batch_id
