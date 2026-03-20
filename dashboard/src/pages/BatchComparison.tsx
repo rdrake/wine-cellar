@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
+import { useChartColors } from "@/hooks/useChartColors";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -14,8 +15,6 @@ import {
 } from "recharts";
 import type { Batch, Reading } from "@/types";
 import { abv, attenuation } from "@/lib/fermentation";
-
-const COLORS = ["#722F37", "#C5923A", "#2D6A4F", "#5E548E", "#9B2226"];
 const MAX_SELECTED = 5;
 
 interface NormalizedPoint {
@@ -61,6 +60,8 @@ export default function BatchComparison() {
   const [readingsMap, setReadingsMap] = useState<Map<string, Reading[]>>(
     new Map(),
   );
+  const colors = useChartColors();
+  const COLORS = [colors.chart1, colors.chart2, colors.chart3, colors.chart4, colors.chart5];
 
   const fetchBatches = useCallback(() => api.batches.list(), []);
   const { data: batchData, loading, error } = useFetch(fetchBatches);
@@ -108,7 +109,7 @@ export default function BatchComparison() {
   const hasData = selectedIds.length > 0 && merged.length > 0;
 
   return (
-    <div className="p-4 max-w-lg mx-auto space-y-6">
+    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-6">
       <h1 className="font-heading text-xl font-bold">Compare Batches</h1>
 
       {loading && (
@@ -159,27 +160,30 @@ export default function BatchComparison() {
               <XAxis
                 dataKey="hours"
                 type="number"
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 10, fill: colors.mutedForeground }}
                 tickFormatter={(v: number) => `${Math.round(v)}h`}
                 label={{
                   value: "Hours since first reading",
                   position: "insideBottom",
                   offset: -2,
-                  style: { fontSize: 10 },
+                  style: { fontSize: 10, fill: colors.mutedForeground },
                 }}
               />
               <YAxis
                 domain={[0.99, 1.125]}
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 10, fill: colors.mutedForeground }}
                 tickFormatter={(v: number) => v.toFixed(3)}
                 label={{
                   value: "SG",
                   angle: -90,
                   position: "insideLeft",
-                  style: { fontSize: 10 },
+                  style: { fontSize: 10, fill: colors.mutedForeground },
                 }}
               />
               <Tooltip
+                contentStyle={{ backgroundColor: colors.card, borderColor: colors.border, color: colors.cardForeground }}
+                labelStyle={{ color: colors.cardForeground }}
+                itemStyle={{ color: colors.cardForeground }}
                 labelFormatter={(v) => `${Number(v).toFixed(1)} hours`}
                 formatter={(value, name) => {
                   const batch = batchById.get(String(name));

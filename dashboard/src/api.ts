@@ -67,6 +67,8 @@ async function apiFetch<T>(path: string, options: { method?: string; body?: unkn
   if (res.status === 401) {
     // Only clear the key, not the URL — user can re-enter key on the setup screen
     localStorage.removeItem(STORAGE_KEY_KEY);
+    // Redirect to setup so AuthGuard re-evaluates
+    window.location.replace("/setup");
     throw new ApiError(401, { error: "unauthorized", message: "Invalid or missing API key" });
   }
 

@@ -1,17 +1,20 @@
-import { api } from "@/api";
-import { useFetch } from "@/hooks/useFetch";
+import { useMemo } from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
   Line,
-  Scatter,
   XAxis,
   YAxis,
   Tooltip,
   CartesianGrid,
 } from "recharts";
+import type { Reading } from "@/types";
+import { useChartColors } from "@/hooks/useChartColors";
+
 interface Props {
-  batchId: string;
+  readings: Reading[];
+  loading?: boolean;
+  error?: string | null;
 }
 
 function toEpoch(ts: string) {
@@ -26,31 +29,38 @@ function fmtDateTime(ms: number) {
   return new Date(ms).toLocaleString();
 }
 
-export default function ReadingsChart({ batchId }: Props) {
-  const { data, loading, error } = useFetch(
-    () => api.readings.listByBatch(batchId, { limit: 500 }),
-    [batchId],
-  );
+export default function ReadingsChart({ readings, loading, error }: Props) {
+  const all = readings;
+  const colors = useChartColors();
 
-  const all = data?.items.slice().reverse() ?? [];
+  const { device, manual, hasTemp, domain } = useMemo(() => {
+    const dev: (Reading & { t: number })[] = [];
+    const man: (Reading & { t: number })[] = [];
+    let temp = false;
+    let tMin = Infinity;
+    let tMax = -Infinity;
+    for (const r of all) {
+      const t = toEpoch(r.source_timestamp);
+      if (t < tMin) tMin = t;
+      if (t > tMax) tMax = t;
+      const row = { ...r, t };
+      if (r.source === "manual") man.push(row);
+      else {
+        if (r.temperature != null) temp = true;
+        dev.push(row);
+      }
+    }
+    if (tMin === Infinity) tMin = tMax = 0;
+    const pad = Math.max((tMax - tMin) * 0.02, 3600000);
+    return { device: dev, manual: man, hasTemp: temp, domain: [tMin - pad, tMax + pad] as [number, number] };
+  }, [all]);
 
-  // Convert to epoch for proper time axis
-  const device = all
-    .filter((r) => r.source !== "manual")
-    .map((r) => ({ ...r, t: toEpoch(r.source_timestamp) }));
-  const manual = all
-    .filter((r) => r.source === "manual")
-    .map((r) => ({ ...r, t: toEpoch(r.source_timestamp) }));
-
-  const hasTemp = device.some((r) => r.temperature != null);
-
-  // Compute time domain from all readings
-  const allTimes = all.map((r) => toEpoch(r.source_timestamp));
-  const tMin = allTimes.length > 0 ? Math.min(...allTimes) : 0;
-  const tMax = allTimes.length > 0 ? Math.max(...allTimes) : 0;
-  // Add 2% padding on each side
-  const pad = Math.max((tMax - tMin) * 0.02, 3600000); // at least 1 hour
-  const domain: [number, number] = [tMin - pad, tMax + pad];
+  const tickStyle = { fontSize: 10, fill: colors.mutedForeground };
+  const tooltipContentStyle = {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    color: colors.cardForeground,
+  };
 
   return (
     <section>
@@ -77,26 +87,29 @@ export default function ReadingsChart({ batchId }: Props) {
                   scale="time"
                   domain={domain}
                   allowDuplicatedCategory={false}
-                  tick={{ fontSize: 10 }}
+                  tick={tickStyle}
                   tickFormatter={(v: number) => fmtDate(v)}
                 />
                 <YAxis
                   yAxisId="gravity"
                   domain={[0.990, 1.125]}
-                  tick={{ fontSize: 10 }}
+                  tick={tickStyle}
                   tickFormatter={(v: number) => v.toFixed(3)}
-                  label={{ value: "SG", angle: -90, position: "insideLeft", style: { fontSize: 10 } }}
+                  label={{ value: "SG", angle: -90, position: "insideLeft", style: { fontSize: 10, fill: colors.mutedForeground } }}
                 />
                 {hasTemp && (
                   <YAxis
                     yAxisId="temperature"
                     orientation="right"
                     domain={["auto", "auto"]}
-                    tick={{ fontSize: 10 }}
-                    label={{ value: "\u00B0C", angle: 90, position: "insideRight", style: { fontSize: 10 } }}
+                    tick={tickStyle}
+                    label={{ value: "\u00B0C", angle: 90, position: "insideRight", style: { fontSize: 10, fill: colors.mutedForeground } }}
                   />
                 )}
                 <Tooltip
+                  contentStyle={tooltipContentStyle}
+                  labelStyle={{ color: colors.cardForeground }}
+                  itemStyle={{ color: colors.cardForeground }}
                   labelFormatter={(v) => fmtDateTime(Number(v))}
                   formatter={(value, name) => {
                     const v = Number(value);
@@ -111,22 +124,23 @@ export default function ReadingsChart({ batchId }: Props) {
                     yAxisId="gravity"
                     type="monotone"
                     dataKey="gravity"
-                    stroke="#722F37"
+                    stroke={colors.chart1}
                     strokeWidth={2}
                     dot={false}
                     isAnimationActive={false}
                   />
                 )}
-                {/* Manual readings as dots */}
+                {/* Manual readings as line with dots */}
                 {manual.length > 0 && (
-                  <Scatter
+                  <Line
                     data={manual}
                     yAxisId="gravity"
+                    type="monotone"
                     dataKey="gravity"
-                    fill="#722F37"
-                    stroke="#fff"
-                    strokeWidth={1}
-                    r={4}
+                    stroke={colors.chart1}
+                    strokeWidth={2}
+                    strokeDasharray="6 3"
+                    dot={{ fill: colors.chart1, stroke: colors.card, strokeWidth: 1, r: 3 }}
                     isAnimationActive={false}
                     name="manual_gravity"
                   />
@@ -138,7 +152,7 @@ export default function ReadingsChart({ batchId }: Props) {
                     yAxisId="temperature"
                     type="monotone"
                     dataKey="temperature"
-                    stroke="#C5923A"
+                    stroke={colors.chart2}
                     strokeWidth={2}
                     dot={false}
                     isAnimationActive={false}
@@ -149,8 +163,8 @@ export default function ReadingsChart({ batchId }: Props) {
           </div>
           {manual.length > 0 && device.length > 0 && (
             <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-[#722F37]" /> Device</span>
-              <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-[#722F37] border border-white" /> Manual</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-chart-1" /> Device</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-chart-1 border-dashed border-t border-chart-1" /><span className="inline-block w-1.5 h-1.5 rounded-full bg-chart-1 -ml-0.5" /> Manual</span>
             </div>
           )}
         </>

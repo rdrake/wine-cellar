@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import type { Activity } from "@/types";
 import ActivityItem from "./ActivityItem";
+import DetailFields from "./DetailFields";
 
 interface Props {
   batchId: string;
@@ -27,6 +28,7 @@ export default function ActivitySection({ batchId, batchStatus }: Props) {
     [batchId],
   );
   const [editing, setEditing] = useState<Activity | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   async function handleDelete(activityId: string) {
     try {
@@ -34,7 +36,7 @@ export default function ActivitySection({ batchId, batchStatus }: Props) {
       toast.success("Activity deleted");
       refetch();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Delete failed");
+      toast.error(e instanceof Error ? e.message : "Couldn't delete activity. Please try again.");
     }
   }
 
@@ -49,8 +51,8 @@ export default function ActivitySection({ batchId, batchStatus }: Props) {
         )}
       </div>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {loading && <p className="text-sm text-muted-foreground">Loading activities...</p>}
+      {error && <p className="text-sm text-destructive">Couldn't load activities. {error}</p>}
       {data && data.items.length === 0 && (
         <p className="text-sm text-muted-foreground py-4 text-center">
           No activities logged. Tap + Log to record your first activity.
@@ -62,7 +64,7 @@ export default function ActivitySection({ batchId, batchStatus }: Props) {
             key={activity.id}
             activity={activity}
             onEdit={setEditing}
-            onDelete={handleDelete}
+            onDelete={(id) => setConfirmDelete(id)}
           />
         ))}
       </div>
@@ -75,8 +77,51 @@ export default function ActivitySection({ batchId, batchStatus }: Props) {
           onSaved={() => { setEditing(null); refetch(); }}
         />
       )}
+
+      <Dialog open={!!confirmDelete} onOpenChange={() => setConfirmDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this activity?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { if (confirmDelete) handleDelete(confirmDelete); setConfirmDelete(null); }}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
+}
+
+/** Convert activity.details (Record<string, unknown> | null) to string record for form fields */
+function detailsToStrings(details: Record<string, unknown> | null): Record<string, string> {
+  if (!details) return {};
+  const result: Record<string, string> = {};
+  for (const [k, v] of Object.entries(details)) {
+    result[k] = v == null ? "" : String(v);
+  }
+  return result;
+}
+
+/** Convert string record back to typed values (numbers where applicable) */
+function parseDetails(details: Record<string, string>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(details)) {
+    if (v === "") continue;
+    const num = Number(v);
+    result[k] = isNaN(num) ? v : num;
+  }
+  return result;
+}
+
+function toLocalDatetime(iso: string): string {
+  const d = new Date(iso);
+  const offset = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - offset * 60_000);
+  return local.toISOString().slice(0, 16);
 }
 
 function EditActivityDialog({ batchId, activity, onClose, onSaved }: {
@@ -86,16 +131,23 @@ function EditActivityDialog({ batchId, activity, onClose, onSaved }: {
   onSaved: () => void;
 }) {
   const [title, setTitle] = useState(activity.title);
+  const [recordedAt, setRecordedAt] = useState(toLocalDatetime(activity.recorded_at));
+  const [details, setDetails] = useState<Record<string, string>>(detailsToStrings(activity.details));
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
     setSaving(true);
     try {
-      await api.activities.update(batchId, activity.id, { title });
+      const parsed = parseDetails(details);
+      await api.activities.update(batchId, activity.id, {
+        title,
+        recorded_at: new Date(recordedAt).toISOString(),
+        details: Object.keys(parsed).length > 0 ? parsed : null,
+      });
       toast.success("Activity updated");
       onSaved();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Update failed");
+      toast.error(e instanceof Error ? e.message : "Couldn't update activity. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -107,9 +159,20 @@ function EditActivityDialog({ batchId, activity, onClose, onSaved }: {
         <DialogHeader>
           <DialogTitle>Edit Activity</DialogTitle>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label>Title</Label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Title</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Added yeast nutrient" />
+          </div>
+          <div className="space-y-2">
+            <Label>Recorded At</Label>
+            <Input
+              type="datetime-local"
+              value={recordedAt}
+              onChange={(e) => setRecordedAt(e.target.value)}
+            />
+          </div>
+          <DetailFields type={activity.type} details={details} onChange={setDetails} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>

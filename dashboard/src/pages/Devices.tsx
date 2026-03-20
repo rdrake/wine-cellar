@@ -52,8 +52,13 @@ export default function Devices() {
     <div className="p-4 max-w-lg mx-auto">
       <h1 className="text-xl font-bold mb-4">Devices</h1>
 
-      {loading && <p className="text-muted-foreground text-sm">Loading...</p>}
-      {error && <p className="text-destructive text-sm">{error}</p>}
+      {loading && <p className="text-muted-foreground text-sm">Loading devices...</p>}
+      {error && (
+        <div className="text-destructive text-sm">
+          <p>Couldn't load devices. {error}</p>
+          <Button variant="link" size="sm" className="px-0" onClick={refetch}>Try again</Button>
+        </div>
+      )}
 
       {devicesData && devicesData.items.length === 0 && (
         <p className="text-muted-foreground text-sm py-8 text-center">
@@ -86,7 +91,7 @@ export default function Devices() {
                           toast.success("Device unassigned");
                           refetch();
                         } catch (e: unknown) {
-                          toast.error(e instanceof Error ? e.message : "Unassign failed");
+                          toast.error(e instanceof Error ? e.message : "Couldn't unassign device. Please try again.");
                         }
                       }}>
                         Unassign
@@ -134,7 +139,7 @@ function AssignDialog({ device, onClose, onAssigned }: { device: Device; onClose
       toast.success("Device assigned");
       onAssigned();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Assignment failed");
+      toast.error(e instanceof Error ? e.message : "Couldn't assign device. Please try again.");
     } finally {
       setAssigning(false);
     }

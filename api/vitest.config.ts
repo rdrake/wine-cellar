@@ -1,7 +1,11 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
 
-const migrationSql = readFileSync("./migrations/0001_initial.sql", "utf-8");
+const migrationSql = readdirSync("./migrations")
+  .filter((f) => f.endsWith(".sql"))
+  .sort()
+  .map((f) => readFileSync(`./migrations/${f}`, "utf-8"))
+  .join("\n");
 
 export default defineWorkersConfig({
   test: {

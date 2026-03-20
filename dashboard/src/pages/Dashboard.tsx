@@ -6,6 +6,17 @@ import { STAGE_LABELS, WINE_TYPE_LABELS } from "@/types";
 import type { BatchSummary } from "@/types";
 import { attenuation, detectStall } from "@/lib/fermentation";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+const WINE_TYPE_COLORS: Record<string, string> = {
+  red: "bg-red-800",
+  white: "bg-amber-300",
+  "rosé": "bg-pink-400",
+  orange: "bg-orange-400",
+  sparkling: "bg-yellow-200",
+  dessert: "bg-amber-700",
+};
 
 function BatchRow({ batch }: { batch: BatchSummary }) {
   const og = batch.first_reading?.gravity;
@@ -25,6 +36,7 @@ function BatchRow({ batch }: { batch: BatchSummary }) {
     <Link to={`/batches/${batch.id}`} className="block active:bg-accent/50 -mx-4 px-4 py-3 transition-colors">
       {/* Row 1: Name + context */}
       <div className="flex justify-between items-baseline">
+        <span className={cn("inline-block w-2.5 h-2.5 rounded-full mr-1.5 shrink-0 translate-y-[-1px]", WINE_TYPE_COLORS[batch.wine_type])} />
         <span className="font-semibold truncate">{batch.name}</span>
         <span className="text-xs text-muted-foreground ml-2 shrink-0">
           {WINE_TYPE_LABELS[batch.wine_type]} · {STAGE_LABELS[batch.stage]}
@@ -54,7 +66,7 @@ function BatchRow({ batch }: { batch: BatchSummary }) {
             )}
             {stallReason && (
               <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                Stall
+                Stalled
               </Badge>
             )}
           </div>
@@ -70,7 +82,7 @@ function BatchRow({ batch }: { batch: BatchSummary }) {
           )}
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground mt-1">Day {batch.days_fermenting} · no readings</p>
+        <p className="text-xs text-muted-foreground mt-1">Day {batch.days_fermenting} · no readings yet</p>
       )}
 
       {/* Row 3: Context line */}
@@ -100,9 +112,14 @@ export default function Dashboard() {
   const { data, loading, error } = useFetch(() => api.dashboard(), []);
 
   return (
-    <div className="p-4 max-w-lg mx-auto">
-      {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto">
+      {loading && <p className="text-sm text-muted-foreground">Loading your batches...</p>}
+      {error && (
+        <div className="text-sm text-destructive">
+          <p>Couldn't load your dashboard. {error}</p>
+          <Button variant="link" size="sm" className="px-0" onClick={() => window.location.reload()}>Try again</Button>
+        </div>
+      )}
 
       {data && (
         <>
@@ -112,7 +129,7 @@ export default function Dashboard() {
             </h2>
             {data.active_batches.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">
-                No active batches.
+                No active batches yet. Press + to start your first batch.
               </p>
             ) : (
               <div className="divide-y divide-border">
@@ -129,7 +146,7 @@ export default function Dashboard() {
             </h2>
             {data.recent_activities.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">
-                No activities logged yet.
+                No activities yet. Log your first action to start tracking.
               </p>
             ) : (
               <div className="divide-y divide-border">
@@ -155,6 +172,15 @@ export default function Dashboard() {
           </section>
         </>
       )}
+
+      <Link to="/batches/new">
+        <Button
+          size="lg"
+          className="fixed bottom-32 right-4 rounded-full w-14 h-14 text-2xl shadow-lg z-40"
+        >
+          +
+        </Button>
+      </Link>
     </div>
   );
 }

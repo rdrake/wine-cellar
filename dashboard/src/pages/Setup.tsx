@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Wine } from "lucide-react";
 import { setApiConfig, clearApiConfig, api } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,7 @@ export default function Setup() {
       navigate("/");
     } catch {
       clearApiConfig();
-      setError("Could not connect. Check the URL and API key.");
+      setError("Connection failed. The URL or API key may be incorrect — double-check both and try again.");
     } finally {
       setTesting(false);
     }
@@ -35,8 +36,10 @@ export default function Setup() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
+          <Wine className="size-10 text-primary mx-auto mb-2" strokeWidth={1.5} />
           <CardTitle className="font-heading text-2xl tracking-tight">Wine Cellar</CardTitle>
           <CardDescription>Connect to your API</CardDescription>
+          <p className="text-xs text-muted-foreground">Your personal winemaking dashboard</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -64,7 +67,7 @@ export default function Setup() {
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={testing}>
-              {testing ? "Testing..." : "Connect"}
+              {testing ? "Connecting..." : "Connect"}
             </Button>
           </form>
         </CardContent>

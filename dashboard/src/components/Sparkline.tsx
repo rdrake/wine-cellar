@@ -31,7 +31,7 @@ export default function Sparkline({
   domain,
   width = 120,
   height = 28,
-  color = "#722F37",
+  color = "currentColor",
   strokeWidth = 1.5,
   endDot = true,
   className = "",
@@ -65,11 +65,11 @@ export default function Sparkline({
 }
 
 /** Convenience: gravity sparkline with fixed winemaking domain */
-export function GravitySparkline({ values, ...props }: Omit<SparklineProps, "domain" | "color"> & { values: number[] }) {
-  return <Sparkline values={values} domain={[0.990, 1.125]} color="#722F37" {...props} />;
+export function GravitySparkline({ values, className, ...props }: Omit<SparklineProps, "domain" | "color"> & { values: number[] }) {
+  return <Sparkline values={values} domain={[0.990, 1.125]} className={`text-chart-1 ${className ?? ""}`} {...props} />;
 }
 
 /** Convenience: temperature sparkline with auto domain, amber color */
-export function TemperatureSparkline({ values, ...props }: Omit<SparklineProps, "color"> & { values: number[] }) {
-  return <Sparkline values={values} color="#C5923A" {...props} />;
+export function TemperatureSparkline({ values, className, ...props }: Omit<SparklineProps, "color"> & { values: number[] }) {
+  return <Sparkline values={values} className={`text-chart-2 ${className ?? ""}`} {...props} />;
 }

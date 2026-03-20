@@ -37,13 +37,13 @@ export default function BatchStats({ batch, readings }: { batch: Batch; readings
         <Stat label="OG → SG" value={`${og.toFixed(3)} → ${sg.toFixed(3)}`} />
         {vel !== null && (
           <Stat
-            label="Velocity (48h)"
+            label="Gravity change (48h)"
             value={`${vel > 0 ? "+" : ""}${(vel * 1000).toFixed(1)}`}
             unit="pts/day"
           />
         )}
         {proj !== null && proj > 0 && (
-          <Stat label="Est. days to 0.996" value={String(proj)} unit="d" />
+          <Stat label="Est. days to dry (0.996)" value={String(proj)} unit="d" />
         )}
         <Stat label="Days fermenting" value={String(days)} />
         {temps && (

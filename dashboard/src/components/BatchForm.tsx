@@ -53,7 +53,7 @@ export default function BatchForm({ initial, editMode, onSubmit, onCancel, submi
     try {
       await onSubmit(form);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Couldn't save batch. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -117,7 +117,7 @@ export default function BatchForm({ initial, editMode, onSubmit, onCancel, submi
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="target_volume">Target Vol (L)</Label>
+          <Label htmlFor="target_volume">Target Volume (L)</Label>
           <Input
             id="target_volume"
             type="number"

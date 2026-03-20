@@ -15,18 +15,18 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="flex items-center justify-between px-4 py-3" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
+      <header className="flex items-center justify-between px-4 py-3 max-w-lg lg:max-w-3xl mx-auto" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <h1 className="font-heading text-lg tracking-tight text-primary">Wine Cellar</h1>
         <div className="flex items-center gap-1">
           <ThemeToggle />
           <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={handleReset}>
-            Reset
+            Disconnect
           </Button>
         </div>
       </header>
       <Outlet />
       <BottomNav />
-      <Toaster position="top-center" />
+      <Toaster position="top-center" style={{ top: "env(safe-area-inset-top, 0px)" }} />
     </div>
   );
 }

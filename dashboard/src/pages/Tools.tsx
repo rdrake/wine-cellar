@@ -3,10 +3,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
 
-function useField(initial: number) {
+function useField(initial: number, decimals?: number) {
   const [value, setValue] = useState(initial);
-  const [text, setText] = useState(String(initial));
+  const [text, setText] = useState(decimals != null ? initial.toFixed(decimals) : String(initial));
   function setFromText(e: React.ChangeEvent<HTMLInputElement>) {
     setText(e.target.value);
     const n = parseFloat(e.target.value);
@@ -14,9 +15,9 @@ function useField(initial: number) {
   }
   function setFromSlider(v: number) {
     setValue(v);
-    setText(String(v));
+    setText(decimals != null ? v.toFixed(decimals) : String(v));
   }
-  return { value, text, setFromText, setFromSlider, ok: !isNaN(value) };
+  return { value, text, setFromText, setFromSlider };
 }
 
 function Result({ label, value, unit }: { label: string; value: string; unit?: string }) {
@@ -31,11 +32,9 @@ function Result({ label, value, unit }: { label: string; value: string; unit?: s
   );
 }
 
-function SliderField({ id, label, min, max, step, value, text, onSlider, onInput }: {
+function SliderField({ id, label, min, max, step, field }: {
   id: string; label: string; min: number; max: number; step: number;
-  value: number; text: string;
-  onSlider: (v: number) => void;
-  onInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  field: ReturnType<typeof useField>;
 }) {
   return (
     <div className="space-y-1.5">
@@ -43,132 +42,132 @@ function SliderField({ id, label, min, max, step, value, text, onSlider, onInput
         <Label htmlFor={id} className="text-xs">{label}</Label>
         <Input
           id={id} type="number" step={step} inputMode="decimal"
-          value={text} onChange={onInput}
+          value={field.text} onChange={field.setFromText}
           className="w-20 h-7 text-xs text-right tabular-nums"
         />
       </div>
       <Slider
         min={min} max={max} step={step}
-        value={[value]}
-        onValueChange={(v) => onSlider(Array.isArray(v) ? v[0] : v)}
+        value={[field.value]}
+        onValueChange={(v) => field.setFromSlider(Array.isArray(v) ? v[0] : v)}
       />
     </div>
+  );
+}
+
+function CollapsibleCard({ title, description, defaultOpen = false, children }: {
+  title: string; description?: string; defaultOpen?: boolean; children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Card>
+      <button
+        type="button"
+        className="w-full p-4 flex justify-between items-center text-left"
+        onClick={() => setOpen(!open)}
+      >
+        <div>
+          <h2 className="font-heading font-semibold">{title}</h2>
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        </div>
+        <span className={cn("text-muted-foreground transition-transform", open && "rotate-180")}>▾</span>
+      </button>
+      {open && <CardContent className="p-4 pt-0 space-y-4">{children}</CardContent>}
+    </Card>
   );
 }
 
 // ─── ABV Calculator ────────────────────────────────────────────────
 
 function ABVCalculator() {
-  const og = useField(1.09);
-  const fg = useField(0.996);
+  const og = useField(1.09, 3);
+  const fg = useField(0.996, 3);
 
-  const abv = og.ok && fg.ok ? (og.value - fg.value) * 131.25 : null;
-  const att = og.ok && fg.ok && og.value > 1
+  const abv = (og.value - fg.value) * 131.25;
+  const att = og.value > 1
     ? Math.min(100, ((og.value - fg.value) / (og.value - 1)) * 100)
     : null;
 
   return (
-    <Card>
-      <CardContent className="p-4 space-y-4">
-        <h2 className="font-heading font-semibold">ABV</h2>
-        <SliderField id="abv-og" label="Original Gravity" min={1.0} max={1.16} step={0.001}
-          value={og.value} text={og.text} onSlider={og.setFromSlider} onInput={og.setFromText} />
-        <SliderField id="abv-fg" label="Final Gravity" min={0.98} max={1.06} step={0.001}
-          value={fg.value} text={fg.text} onSlider={fg.setFromSlider} onInput={fg.setFromText} />
-        {abv !== null && abv >= 0 && (
-          <div className="border-t pt-2 space-y-0.5">
-            <Result label="ABV" value={abv.toFixed(1)} unit="%" />
-            {att !== null && att >= 0 && <Result label="Apparent Attenuation" value={att.toFixed(0)} unit="%" />}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <CollapsibleCard title="ABV" defaultOpen={true}>
+      <SliderField id="abv-og" label="Original Gravity" min={1.0} max={1.16} step={0.001} field={og} />
+      <SliderField id="abv-fg" label="Final Gravity" min={0.98} max={1.06} step={0.001} field={fg} />
+      {abv >= 0 && (
+        <div className="border-t pt-2 space-y-0.5">
+          <Result label="Estimated ABV" value={abv.toFixed(1)} unit="%" />
+          {att !== null && att >= 0 && <Result label="Apparent Attenuation" value={att.toFixed(0)} unit="%" />}
+        </div>
+      )}
+    </CollapsibleCard>
   );
 }
 
 // ─── Chaptalization Calculator ─────────────────────────────────────
 
 function ChaptalizationCalculator() {
-  const vol = useField(23);
-  const current = useField(1.05);
-  const target = useField(1.08);
+  const vol = useField(23, 1);
+  const current = useField(1.05, 3);
+  const target = useField(1.08, 3);
 
-  const pts = current.ok && target.ok ? (target.value - current.value) * 1000 : null;
-  const sugar = pts !== null && pts > 0 && vol.ok ? vol.value * pts * 2.65 : null;
+  const pts = (target.value - current.value) * 1000;
+  const sugar = pts > 0 ? vol.value * pts * 2.65 : null;
 
   return (
-    <Card>
-      <CardContent className="p-4 space-y-4">
-        <h2 className="font-heading font-semibold">Chaptalization</h2>
-        <p className="text-xs text-muted-foreground -mt-2">Sugar addition to raise specific gravity</p>
-        <SliderField id="chap-vol" label="Volume (L)" min={1} max={100} step={0.5}
-          value={vol.value} text={vol.text} onSlider={vol.setFromSlider} onInput={vol.setFromText} />
-        <SliderField id="chap-cur" label="Current SG" min={1.0} max={1.16} step={0.001}
-          value={current.value} text={current.text} onSlider={current.setFromSlider} onInput={current.setFromText} />
-        <SliderField id="chap-tgt" label="Target SG" min={1.0} max={1.16} step={0.001}
-          value={target.value} text={target.text} onSlider={target.setFromSlider} onInput={target.setFromText} />
-        {sugar !== null && (
-          <div className="border-t pt-2 space-y-0.5">
-            <Result
-              label="Table Sugar"
-              value={sugar >= 1000 ? (sugar / 1000).toFixed(2) : sugar.toFixed(0)}
-              unit={sugar >= 1000 ? "kg" : "g"}
-            />
-            <Result label="Gravity Points" value={`+${pts!.toFixed(0)}`} />
-          </div>
-        )}
-        {pts !== null && pts <= 0 && (
-          <p className="text-xs text-muted-foreground border-t pt-2">
-            Target must be higher than current SG.
-          </p>
-        )}
-      </CardContent>
-    </Card>
+    <CollapsibleCard title="Chaptalization" description="How much sugar to reach your target gravity">
+      <SliderField id="chap-vol" label="Batch Volume (L)" min={1} max={100} step={0.5} field={vol} />
+      <SliderField id="chap-cur" label="Current SG" min={1.0} max={1.16} step={0.001} field={current} />
+      <SliderField id="chap-tgt" label="Target SG" min={1.0} max={1.16} step={0.001} field={target} />
+      {sugar !== null && (
+        <div className="border-t pt-2 space-y-0.5">
+          <Result
+            label="Sugar Needed"
+            value={sugar >= 1000 ? (sugar / 1000).toFixed(2) : sugar.toFixed(0)}
+            unit={sugar >= 1000 ? "kg" : "g"}
+          />
+          <Result label="Gravity Increase" value={`+${pts.toFixed(0)}`} unit="pts" />
+        </div>
+      )}
+      {pts <= 0 && (
+        <p className="text-xs text-muted-foreground border-t pt-2">
+          Target must be higher than current SG. Raise the target to calculate a sugar addition.
+        </p>
+      )}
+    </CollapsibleCard>
   );
 }
 
 // ─── Sulfite Calculator ────────────────────────────────────────────
 
 function SulfiteCalculator() {
-  const vol = useField(23);
-  const ph = useField(3.4);
+  const vol = useField(23, 1);
+  const ph = useField(3.4, 2);
   const target = useField(30);
   const current = useField(0);
 
-  const delta = target.ok && current.ok ? target.value - current.value : null;
-  const kms = delta !== null && delta > 0 && vol.ok ? (delta * vol.value) / 576 : null;
-  const molSO2 = ph.ok && target.ok
-    ? target.value / (1 + Math.pow(10, ph.value - 1.81))
-    : null;
+  const delta = target.value - current.value;
+  const kms = delta > 0 ? (delta * vol.value) / 576 : null;
+  const molSO2 = target.value / (1 + Math.pow(10, ph.value - 1.81));
 
   return (
-    <Card>
-      <CardContent className="p-4 space-y-4">
-        <h2 className="font-heading font-semibold">Sulfite Addition</h2>
-        <p className="text-xs text-muted-foreground -mt-2">Potassium metabisulfite (KMS) dosing</p>
-        <SliderField id="so2-vol" label="Volume (L)" min={1} max={100} step={0.5}
-          value={vol.value} text={vol.text} onSlider={vol.setFromSlider} onInput={vol.setFromText} />
-        <SliderField id="so2-ph" label="pH" min={2.8} max={4.2} step={0.01}
-          value={ph.value} text={ph.text} onSlider={ph.setFromSlider} onInput={ph.setFromText} />
-        <SliderField id="so2-tgt" label="Target Free SO₂ (ppm)" min={0} max={100} step={1}
-          value={target.value} text={target.text} onSlider={target.setFromSlider} onInput={target.setFromText} />
-        <SliderField id="so2-cur" label="Current Free SO₂ (ppm)" min={0} max={100} step={1}
-          value={current.value} text={current.text} onSlider={current.setFromSlider} onInput={current.setFromText} />
-        {kms !== null && (
-          <div className="border-t pt-2 space-y-0.5">
-            <Result label="KMS to Add" value={kms.toFixed(2)} unit="g" />
-            {molSO2 !== null && (
-              <>
-                <Result label="Molecular SO₂" value={molSO2.toFixed(2)} unit="ppm" />
-                <p className="text-xs text-muted-foreground pt-1">
-                  Target: 0.5–0.8 ppm molecular SO₂
-                </p>
-              </>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <CollapsibleCard title="Sulfite Addition" description="Potassium metabisulfite (KMS) dosing">
+      <SliderField id="so2-vol" label="Batch Volume (L)" min={1} max={100} step={0.5} field={vol} />
+      <SliderField id="so2-ph" label="pH" min={2.8} max={4.2} step={0.01} field={ph} />
+      <SliderField id="so2-tgt" label="Target Free SO₂ (ppm)" min={0} max={100} step={1} field={target} />
+      <SliderField id="so2-cur" label="Current Free SO₂ (ppm)" min={0} max={100} step={1} field={current} />
+      {kms !== null && (
+        <div className="border-t pt-2 space-y-0.5">
+          <Result label="KMS to Add" value={kms.toFixed(2)} unit="g" />
+          {molSO2 > 0 && (
+            <>
+              <Result label="Molecular SO₂" value={molSO2.toFixed(2)} unit="ppm" />
+              <p className="text-xs text-muted-foreground pt-1">
+                Target: 0.5–0.8 ppm molecular SO₂
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </CollapsibleCard>
   );
 }
 
@@ -191,40 +190,80 @@ function tempCorrection(t: number): number {
 }
 
 function TempCorrectionCalculator() {
-  const sg = useField(1.05);
-  const temp = useField(25);
-  const cal = useField(20);
+  const sg = useField(1.05, 3);
+  const temp = useField(25, 1);
+  const cal = useField(20, 1);
 
-  const corrected = sg.ok && temp.ok && cal.ok
-    ? sg.value + tempCorrection(temp.value) - tempCorrection(cal.value)
-    : null;
-  const delta = corrected !== null ? corrected - sg.value : null;
+  const corrected = sg.value + tempCorrection(temp.value) - tempCorrection(cal.value);
+  const delta = corrected - sg.value;
 
   return (
-    <Card>
-      <CardContent className="p-4 space-y-4">
-        <h2 className="font-heading font-semibold">Hydrometer Correction</h2>
-        <p className="text-xs text-muted-foreground -mt-2">Correct SG reading for sample temperature</p>
-        <SliderField id="tc-sg" label="Observed SG" min={0.99} max={1.16} step={0.001}
-          value={sg.value} text={sg.text} onSlider={sg.setFromSlider} onInput={sg.setFromText} />
-        <SliderField id="tc-temp" label="Sample °C" min={0} max={40} step={0.5}
-          value={temp.value} text={temp.text} onSlider={temp.setFromSlider} onInput={temp.setFromText} />
-        <SliderField id="tc-cal" label="Calibration °C" min={10} max={25} step={0.5}
-          value={cal.value} text={cal.text} onSlider={cal.setFromSlider} onInput={cal.setFromText} />
-        {corrected !== null && (
+    <CollapsibleCard title="Hydrometer Correction" description="Get an accurate SG from an off-temperature sample">
+      <SliderField id="tc-sg" label="Observed SG" min={0.99} max={1.16} step={0.001} field={sg} />
+      <SliderField id="tc-temp" label="Sample °C" min={0} max={40} step={0.5} field={temp} />
+      <SliderField id="tc-cal" label="Calibration °C" min={10} max={25} step={0.5} field={cal} />
+      <div className="border-t pt-2 space-y-0.5">
+        <Result label="Corrected SG" value={corrected.toFixed(4)} />
+        <Result
+          label="Correction"
+          value={`${delta >= 0 ? "+" : ""}${(delta * 1000).toFixed(1)}`}
+          unit="pts"
+        />
+      </div>
+    </CollapsibleCard>
+  );
+}
+
+// ─── Calibration Solution ─────────────────────────────────────────
+
+/** Convert SG to Brix using the standard polynomial approximation. */
+function sgToBrix(sg: number): number {
+  // NBS C440 polynomial (valid 1.000–1.170)
+  return 261.3 * (1 - 1 / sg);
+}
+
+function CalibrationSolutionCalculator() {
+  const vol = useField(0.5, 1);
+  const sg = useField(1.05, 3);
+
+  // Total solution mass (g) = volume (mL) × SG
+  const volMl = vol.value * 1000;
+  const totalMass = volMl * sg.value;
+  const brix = sgToBrix(sg.value);
+  const sugarG = totalMass * (brix / 100);
+
+  // Dissolve sugar in less water, then top up to final volume
+  // Water to start with ≈ 60–70% of final volume (enough to dissolve sugar)
+  const startWaterMl = Math.max(volMl * 0.6, sugarG * 2); // at least 2 mL per g sugar to dissolve
+
+  return (
+    <CollapsibleCard title="Calibration Solution" description="Make a reference solution to verify your hydrometer">
+      <SliderField id="cal-vol" label="Final Volume (L)" min={0.1} max={2} step={0.1} field={vol} />
+      <SliderField id="cal-sg" label="Target SG" min={1.0} max={1.12} step={0.001} field={sg} />
+      {sg.value > 1.0 && (
+        <>
           <div className="border-t pt-2 space-y-0.5">
-            <Result label="Corrected SG" value={corrected.toFixed(4)} />
-            {delta !== null && (
-              <Result
-                label="Correction"
-                value={`${delta >= 0 ? "+" : ""}${(delta * 1000).toFixed(1)}`}
-                unit="pts"
-              />
-            )}
+            <Result label="Sugar Needed" value={sugarG >= 1000 ? (sugarG / 1000).toFixed(2) : sugarG.toFixed(1)} unit={sugarG >= 1000 ? "kg" : "g"} />
+            <Result label="Distilled Water" value={`fill to ${vol.value < 1 ? (volMl).toFixed(0) + " mL" : vol.value.toFixed(1) + " L"}`} />
+            <Result label="Brix" value={brix.toFixed(1)} unit="°Bx" />
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <div className="border-t pt-2">
+            <p className="text-xs font-medium mb-1.5">How to Prepare</p>
+            <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+              <li>Weigh <strong>{sugarG.toFixed(1)} g</strong> white granulated sugar</li>
+              <li>Add ~{startWaterMl.toFixed(0)} mL distilled water at 20 °C and stir until fully dissolved</li>
+              <li>Pour into a graduated vessel and top up to <strong>{volMl.toFixed(0)} mL</strong> with distilled water</li>
+              <li>Stir gently, let settle, and verify SG reads {sg.value.toFixed(3)} at 20 °C</li>
+            </ol>
+          </div>
+        </>
+      )}
+      {sg.value <= 1.0 && (
+        <p className="text-xs text-muted-foreground border-t pt-2">
+          Target SG must be above 1.000. Raise it above 1.000 to calculate a recipe.
+        </p>
+      )}
+    </CollapsibleCard>
   );
 }
 
@@ -232,12 +271,15 @@ function TempCorrectionCalculator() {
 
 export default function Tools() {
   return (
-    <div className="p-4 max-w-lg mx-auto space-y-4">
-      <h1 className="font-heading text-xl font-bold">Tools</h1>
-      <ABVCalculator />
-      <ChaptalizationCalculator />
-      <SulfiteCalculator />
-      <TempCorrectionCalculator />
+    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
+      <h1 className="font-heading text-xl font-bold">Winemaking Calculators</h1>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ABVCalculator />
+        <ChaptalizationCalculator />
+        <SulfiteCalculator />
+        <TempCorrectionCalculator />
+        <CalibrationSolutionCalculator />
+      </div>
     </div>
   );
 }

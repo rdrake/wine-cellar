@@ -69,7 +69,7 @@ function SparklineSummary({ readings }: { readings: Reading[] }) {
 }
 
 function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onAction: () => void; onDeleted: () => void }) {
-  const [confirmAction, setConfirmAction] = useState<{ label: string; action: () => Promise<void> } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ label: string; verb: string; verbing: string; action: () => Promise<void> } | null>(null);
   const [acting, setActing] = useState(false);
 
   async function doAction(label: string, action: () => Promise<Batch>) {
@@ -79,15 +79,15 @@ function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onActi
       toast.success(label);
       onAction();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Action failed");
+      toast.error(e instanceof Error ? e.message : "Couldn't complete that action. Please try again.");
     } finally {
       setActing(false);
       setConfirmAction(null);
     }
   }
 
-  function confirm(label: string, action: () => Promise<Batch>) {
-    setConfirmAction({ label, action: () => doAction(label, action) });
+  function confirm(label: string, verb: string, verbing: string, action: () => Promise<Batch>) {
+    setConfirmAction({ label, verb, verbing, action: () => doAction(label, action) });
   }
 
   return (
@@ -101,7 +101,7 @@ function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onActi
             <Button size="sm" variant="outline" onClick={() => doAction("Batch completed", () => api.batches.complete(batch.id))}>
               Complete
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => confirm("Abandon batch?", () => api.batches.abandon(batch.id))}>
+            <Button size="sm" variant="destructive" onClick={() => confirm("Abandon batch?", "Abandon", "Abandoning...", () => api.batches.abandon(batch.id))}>
               Abandon
             </Button>
           </>
@@ -123,7 +123,9 @@ function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onActi
         )}
         {batch.status !== "active" && (
           <Button size="sm" variant="destructive" onClick={() => setConfirmAction({
-            label: "Delete batch?",
+            label: "Permanently delete this batch?",
+            verb: "Delete",
+            verbing: "Deleting...",
             action: async () => {
               setActing(true);
               try {
@@ -131,7 +133,7 @@ function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onActi
                 toast.success("Batch deleted");
                 onDeleted();
               } catch (e: unknown) {
-                toast.error(e instanceof Error ? e.message : "Delete failed");
+                toast.error(e instanceof Error ? e.message : "Couldn't delete batch. Please try again.");
               } finally {
                 setActing(false);
                 setConfirmAction(null);
@@ -152,7 +154,7 @@ function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onActi
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
             <Button variant="destructive" disabled={acting} onClick={confirmAction?.action}>
-              {acting ? "..." : "Confirm"}
+              {acting ? (confirmAction?.verbing ?? "...") : (confirmAction?.verb ?? "Confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -176,13 +178,13 @@ export default function BatchDetail() {
   );
 
   return (
-    <div className="p-4 max-w-lg mx-auto space-y-6">
+    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-6">
       {/* Header — shows loading/error state */}
-      {loading && <p className="text-muted-foreground">Loading...</p>}
+      {loading && <p className="text-muted-foreground">Loading batch details...</p>}
       {error && (
         <div className="text-destructive">
-          {error}
-          <Button variant="link" size="sm" onClick={refetch}>Retry</Button>
+          Couldn't load batch. {error}
+          <Button variant="link" size="sm" onClick={refetch}>Try again</Button>
         </div>
       )}
 
@@ -216,13 +218,13 @@ export default function BatchDetail() {
                 </div>
                 {batch.volume_liters && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Volume</span>
+                    <span className="text-muted-foreground">Current volume</span>
                     <span>{batch.volume_liters} L</span>
                   </div>
                 )}
                 {batch.target_volume_liters && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Target</span>
+                    <span className="text-muted-foreground">Target volume</span>
                     <span>{batch.target_volume_liters} L</span>
                   </div>
                 )}
@@ -242,7 +244,11 @@ export default function BatchDetail() {
 
       {/* These sections mount immediately and fetch in parallel with the batch */}
       <ActivitySection batchId={id!} batchStatus={batch?.status ?? "active"} />
-      <ReadingsChart batchId={id!} />
+      <ReadingsChart
+        readings={readingsData?.items.slice().reverse() ?? []}
+        loading={!readingsData && !error}
+        error={null}
+      />
       <DeviceSection batchId={id!} batchStatus={batch?.status ?? "active"} onAssignmentChange={refetch} />
     </div>
   );

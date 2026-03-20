@@ -20,7 +20,7 @@ export default function BatchList() {
   );
 
   return (
-    <div className="p-4 max-w-lg mx-auto">
+    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto">
       <div className="flex justify-between items-center mb-4">
         <h1 className="font-heading text-xl font-bold">Batches</h1>
         <Link to="/compare">
@@ -38,19 +38,19 @@ export default function BatchList() {
         </TabsList>
       </Tabs>
 
-      <div className="mt-4 space-y-3">
-        {loading && <p className="text-muted-foreground text-sm">Loading...</p>}
+      <div className="mt-4 flex flex-col gap-4">
+        {loading && <p className="text-muted-foreground text-sm">Fetching your batches...</p>}
         {error && (
           <div className="text-sm text-destructive">
-            {error}
-            <Button variant="link" size="sm" onClick={refetch}>Retry</Button>
+            <p>Couldn't load batches. {error}</p>
+            <Button variant="link" size="sm" className="px-0" onClick={refetch}>Try again</Button>
           </div>
         )}
         {data && data.items.length === 0 && (
           <p className="text-muted-foreground text-sm py-8 text-center">
             {status === "active"
-              ? "No batches yet. Tap + to start your first batch."
-              : `No ${status} batches.`}
+              ? "No batches yet. Press + to start your first batch."
+              : `No ${status} batches yet.`}
           </p>
         )}
         {data?.items.map((batch) => (
@@ -61,7 +61,7 @@ export default function BatchList() {
       <Link to="/batches/new">
         <Button
           size="lg"
-          className="fixed bottom-24 right-4 rounded-full w-14 h-14 text-2xl shadow-lg z-40"
+          className="fixed bottom-32 right-4 rounded-full w-14 h-14 text-2xl shadow-lg z-40"
         >
           +
         </Button>

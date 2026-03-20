@@ -13,7 +13,7 @@ interface Props {
 export default function DeviceSection({ batchId, batchStatus, onAssignmentChange }: Props) {
   const { data, loading, refetch } = useFetch(
     () => api.devices.list(),
-    [batchStatus],
+    [batchId],
   );
 
   const assignedDevices = data?.items.filter((d) => d.batch_id === batchId) ?? [];

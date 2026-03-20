@@ -1,4 +1,3 @@
-import * as React from "react"
 import { Slider as SliderPrimitive } from "@base-ui/react/slider"
 
 import { cn } from "@/lib/utils"
@@ -11,15 +10,11 @@ function Slider({
   max = 100,
   ...props
 }: SliderPrimitive.Root.Props) {
-  const _values = React.useMemo(
-    () =>
-      Array.isArray(value)
-        ? value
-        : Array.isArray(defaultValue)
-          ? defaultValue
-          : [min, max],
-    [value, defaultValue, min, max]
-  )
+  const thumbCount = Array.isArray(value)
+    ? value.length
+    : Array.isArray(defaultValue)
+      ? defaultValue.length
+      : 1;
 
   return (
     <SliderPrimitive.Root
@@ -41,7 +36,7 @@ function Slider({
             className="h-full bg-primary"
           />
         </SliderPrimitive.Track>
-        {Array.from({ length: _values.length }, (_, index) => (
+        {Array.from({ length: thumbCount }, (_, index) => (
           <SliderPrimitive.Thumb
             data-slot="slider-thumb"
             key={index}

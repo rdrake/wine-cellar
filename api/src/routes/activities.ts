@@ -31,18 +31,10 @@ activities.post("/", async (c) => {
   const now = nowUtc();
   const detailsJson = parsed.data.details ? JSON.stringify(parsed.data.details) : null;
 
-  await db
-    .prepare(
-      `INSERT INTO activities (id, batch_id, stage, type, title, details, recorded_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(id, batchId, parsed.data.stage, parsed.data.type, parsed.data.title,
-      detailsJson, parsed.data.recorded_at, now, now)
-    .run();
-
-  // If this is an SG measurement, also insert a manual reading
+  // If this is an SG measurement, also insert a manual reading and link it
+  let readingId: string | null = null;
   if (isSgMeasurement(parsed.data.type, parsed.data.details)) {
-    const readingId = crypto.randomUUID();
+    readingId = crypto.randomUUID();
     await db
       .prepare(
         `INSERT INTO readings (id, batch_id, device_id, gravity, temperature, battery, rssi, source_timestamp, created_at, source)
@@ -51,6 +43,15 @@ activities.post("/", async (c) => {
       .bind(readingId, batchId, parsed.data.details!.value, parsed.data.recorded_at, now)
       .run();
   }
+
+  await db
+    .prepare(
+      `INSERT INTO activities (id, batch_id, stage, type, title, details, recorded_at, created_at, updated_at, reading_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(id, batchId, parsed.data.stage, parsed.data.type, parsed.data.title,
+      detailsJson, parsed.data.recorded_at, now, now, readingId)
+    .run();
 
   const row = await db.prepare("SELECT * FROM activities WHERE id = ?").bind(id).first<any>();
   row.details = row.details ? JSON.parse(row.details) : null;
@@ -114,6 +115,20 @@ activities.patch("/:activityId", async (c) => {
   const values = [...Object.values(updates), activityId];
   await db.prepare(`UPDATE activities SET ${setCols} WHERE id = ?`).bind(...values).run();
 
+  // Sync linked reading if SG value or timestamp changed
+  if (row.reading_id) {
+    const newDetails = parsed.data.details !== undefined
+      ? parsed.data.details
+      : (row.details ? JSON.parse(row.details) : null);
+    if (isSgMeasurement(row.type, newDetails)) {
+      const newTimestamp = parsed.data.recorded_at ?? row.recorded_at;
+      await db
+        .prepare("UPDATE readings SET gravity = ?, source_timestamp = ? WHERE id = ?")
+        .bind(newDetails.value, newTimestamp, row.reading_id)
+        .run();
+    }
+  }
+
   const updated = await db.prepare("SELECT * FROM activities WHERE id = ?").bind(activityId).first<any>();
   updated.details = updated.details ? JSON.parse(updated.details) : null;
   return c.json(updated);
@@ -127,13 +142,9 @@ activities.delete("/:activityId", async (c) => {
     .bind(activityId, batchId).first<any>();
   if (!row) return notFound("Activity");
 
-  // If this was an SG measurement, also delete the corresponding manual reading
-  const details = row.details ? JSON.parse(row.details as string) : null;
-  if (isSgMeasurement(row.type as string, details)) {
-    await db
-      .prepare("DELETE FROM readings WHERE batch_id = ? AND source_timestamp = ? AND source = 'manual'")
-      .bind(batchId, row.recorded_at)
-      .run();
+  // Delete the linked manual reading if present
+  if (row.reading_id) {
+    await db.prepare("DELETE FROM readings WHERE id = ?").bind(row.reading_id).run();
   }
 
   await db.prepare("DELETE FROM activities WHERE id = ?").bind(activityId).run();

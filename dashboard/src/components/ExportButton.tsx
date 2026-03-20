@@ -25,9 +25,9 @@ export default function ExportButton({ batch }: { batch: Batch }) {
         downloadCSV(activitiesToCSV(activities.items), `${slug}-activities.csv`);
       }
 
-      toast.success(`Exported ${readings.items.length} readings, ${activities.items.length} activities`);
+      toast.success(`Downloaded ${readings.items.length} readings and ${activities.items.length} activities`);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Export failed");
+      toast.error(e instanceof Error ? e.message : "Couldn't download data. Please try again.");
     } finally {
       setExporting(false);
     }
@@ -35,7 +35,7 @@ export default function ExportButton({ batch }: { batch: Batch }) {
 
   return (
     <Button size="sm" variant="outline" disabled={exporting} onClick={handleExport}>
-      {exporting ? "Exporting..." : "Export CSV"}
+      {exporting ? "Preparing download..." : "Download CSV"}
     </Button>
   );
 }
