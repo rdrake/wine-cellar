@@ -248,15 +248,15 @@ export default function BatchComparison() {
           <Card>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm table-fixed">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left text-xs text-muted-foreground font-medium p-3" />
+                      <th className="text-left text-xs text-muted-foreground font-medium p-3 w-[8.5rem]" />
                       {allStats.map((s) => (
-                        <th key={s.name} className="text-right font-semibold p-3 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5">
+                        <th key={s.name} className="text-right font-semibold p-3 max-w-[7rem]">
+                          <span className="inline-flex items-center justify-end gap-1.5">
                             <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                            {s.name}
+                            <span className="break-words">{s.name}</span>
                           </span>
                         </th>
                       ))}
