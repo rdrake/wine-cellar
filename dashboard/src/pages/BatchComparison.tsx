@@ -14,7 +14,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { Batch, Reading } from "@/types";
-import { abv, attenuation } from "@/lib/fermentation";
+import { abv, attenuation, velocity, tempStats, daysSince, projectedDaysToTarget } from "@/lib/fermentation";
 const MAX_SELECTED = 5;
 
 interface NormalizedPoint {
@@ -45,11 +45,20 @@ function batchStats(batch: Batch, readings: Reading[]) {
   );
   const og = sorted[0].gravity;
   const sg = sorted[sorted.length - 1].gravity;
+  const vel = velocity(sorted);
+  const temps = tempStats(sorted);
+  const days = daysSince(batch.started_at);
+  const proj = vel !== null ? projectedDaysToTarget(sg, 0.996, vel) : null;
   return {
     og,
     sg,
     abv: abv(og, sg),
     attenuation: attenuation(og, sg),
+    velocity: vel,
+    tempMin: temps?.min ?? null,
+    tempMax: temps?.max ?? null,
+    daysFermenting: days,
+    projectedDays: proj,
     name: batch.name,
     readingCount: readings.length,
   };
@@ -226,54 +235,89 @@ export default function BatchComparison() {
         </div>
       )}
 
-      {/* Per-batch stats */}
-      {selectedIds.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="font-semibold text-sm">Stats</h2>
-          {selectedIds.map((id, i) => {
-            const batch = batchById.get(id);
-            const readings = readingsMap.get(id);
-            if (!batch || !readings) return null;
-            const stats = batchStats(batch, readings);
-            if (!stats) return null;
-            return (
-              <Card key={id}>
-                <CardContent className="p-3 text-sm space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="inline-block w-3 h-3 rounded-full"
-                      style={{ backgroundColor: COLORS[i] }}
-                    />
-                    <span className="font-semibold">{stats.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">OG → SG</span>
-                    <span className="tabular-nums">
-                      {stats.og.toFixed(3)} → {stats.sg.toFixed(3)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">ABV</span>
-                    <span className="tabular-nums">
-                      {stats.abv.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Attenuation</span>
-                    <span className="tabular-nums">
-                      {stats.attenuation.toFixed(0)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Readings</span>
-                    <span className="tabular-nums">{stats.readingCount}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+      {/* Stats comparison table */}
+      {selectedIds.length > 0 && (() => {
+        const allStats = selectedIds.map((id, i) => {
+          const batch = batchById.get(id);
+          const readings = readingsMap.get(id);
+          if (!batch || !readings) return null;
+          return { ...batchStats(batch, readings), color: COLORS[i] };
+        }).filter(Boolean) as (NonNullable<ReturnType<typeof batchStats>> & { color: string })[];
+        if (allStats.length === 0) return null;
+        return (
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left text-xs text-muted-foreground font-medium p-3" />
+                      {allStats.map((s) => (
+                        <th key={s.name} className="text-right font-semibold p-3 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                            {s.name}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="tabular-nums">
+                    <tr className="border-b">
+                      <td className="text-xs text-muted-foreground p-3">OG</td>
+                      {allStats.map((s) => <td key={s.name} className="text-right p-3">{s.og.toFixed(3)}</td>)}
+                    </tr>
+                    <tr className="border-b">
+                      <td className="text-xs text-muted-foreground p-3">Current SG</td>
+                      {allStats.map((s) => <td key={s.name} className="text-right p-3">{s.sg.toFixed(3)}</td>)}
+                    </tr>
+                    <tr className="border-b">
+                      <td className="text-xs text-muted-foreground p-3">Est. ABV</td>
+                      {allStats.map((s) => <td key={s.name} className="text-right p-3">{s.abv.toFixed(1)}%</td>)}
+                    </tr>
+                    <tr className="border-b">
+                      <td className="text-xs text-muted-foreground p-3">Attenuation</td>
+                      {allStats.map((s) => <td key={s.name} className="text-right p-3">{s.attenuation.toFixed(0)}%</td>)}
+                    </tr>
+                    <tr className="border-b">
+                      <td className="text-xs text-muted-foreground p-3">Gravity change (48h)</td>
+                      {allStats.map((s) => (
+                        <td key={s.name} className="text-right p-3">
+                          {s.velocity !== null ? `${s.velocity > 0 ? "+" : ""}${(s.velocity * 1000).toFixed(1)} pts/d` : "—"}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr className="border-b">
+                      <td className="text-xs text-muted-foreground p-3">Days fermenting</td>
+                      {allStats.map((s) => <td key={s.name} className="text-right p-3">{s.daysFermenting}</td>)}
+                    </tr>
+                    <tr className="border-b">
+                      <td className="text-xs text-muted-foreground p-3">Est. days to dry</td>
+                      {allStats.map((s) => (
+                        <td key={s.name} className="text-right p-3">
+                          {s.projectedDays !== null && s.projectedDays > 0 ? s.projectedDays : "—"}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr className="border-b">
+                      <td className="text-xs text-muted-foreground p-3">Temp range</td>
+                      {allStats.map((s) => (
+                        <td key={s.name} className="text-right p-3">
+                          {s.tempMin !== null && s.tempMax !== null ? `${s.tempMin.toFixed(1)}–${s.tempMax.toFixed(1)} °C` : "—"}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td className="text-xs text-muted-foreground p-3">Readings</td>
+                      {allStats.map((s) => <td key={s.name} className="text-right p-3">{s.readingCount}</td>)}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {selectedIds.length === 0 && !loading && batches.length > 0 && (
         <p className="text-sm text-muted-foreground py-8 text-center">
