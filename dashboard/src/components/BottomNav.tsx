@@ -1,12 +1,12 @@
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { House, Wine, Radio, Wrench } from "lucide-react";
+import { House, Wine, Wrench, Settings } from "lucide-react";
 
 const tabs = [
   { to: "/", label: "Home", icon: House },
   { to: "/batches", label: "Batches", icon: Wine },
-  { to: "/devices", label: "Devices", icon: Radio },
   { to: "/tools", label: "Calculators", icon: Wrench },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function BottomNav() {

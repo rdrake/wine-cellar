@@ -55,7 +55,7 @@ export default function DeviceSection({ batchId, batchStatus, onAssignmentChange
         <div className="text-center py-4">
           <p className="text-sm text-muted-foreground mb-2">No device assigned</p>
           {batchStatus === "active" && (
-            <Link to="/devices">
+            <Link to="/settings">
               <Button size="sm" variant="outline">Assign Device</Button>
             </Link>
           )}

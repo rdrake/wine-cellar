@@ -74,8 +74,11 @@ function formatDetails(type: ActivityType, details: Record<string, unknown>): Re
       if (unit) parts.push(unit);
       return <span>{parts.join(" ")}</span>;
     }
-    case "note":
-      return null;
+    case "note": {
+      const { body } = details as { body?: string };
+      if (!body) return null;
+      return <span className="whitespace-pre-wrap">{String(body)}</span>;
+    }
     default: {
       // Fallback: render key-value pairs for any unknown type
       return (

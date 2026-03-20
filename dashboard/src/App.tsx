@@ -9,8 +9,8 @@ import BatchDetail from "@/pages/BatchDetail";
 import BatchNew from "@/pages/BatchNew";
 import BatchEdit from "@/pages/BatchEdit";
 import ActivityNew from "@/pages/ActivityNew";
-import Devices from "@/pages/Devices";
 import Tools from "@/pages/Tools";
+import Settings from "@/pages/Settings";
 import BatchComparison from "@/pages/BatchComparison";
 
 export default function App() {
@@ -27,7 +27,7 @@ export default function App() {
               <Route path="/batches/:id" element={<BatchDetail />} />
               <Route path="/batches/:id/edit" element={<BatchEdit />} />
               <Route path="/batches/:id/activities/new" element={<ActivityNew />} />
-              <Route path="/devices" element={<Devices />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/tools" element={<Tools />} />
               <Route path="/compare" element={<BatchComparison />} />
             </Route>

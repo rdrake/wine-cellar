@@ -20,9 +20,10 @@ import DetailFields from "./DetailFields";
 interface Props {
   batchId: string;
   batchStatus: string;
+  onChanged?: () => void;
 }
 
-export default function ActivitySection({ batchId, batchStatus }: Props) {
+export default function ActivitySection({ batchId, batchStatus, onChanged }: Props) {
   const { data, loading, error, refetch } = useFetch(
     () => api.activities.list(batchId),
     [batchId],
@@ -30,11 +31,16 @@ export default function ActivitySection({ batchId, batchStatus }: Props) {
   const [editing, setEditing] = useState<Activity | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
+  function refresh() {
+    refetch();
+    onChanged?.();
+  }
+
   async function handleDelete(activityId: string) {
     try {
       await api.activities.delete(batchId, activityId);
       toast.success("Activity deleted");
-      refetch();
+      refresh();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Couldn't delete activity. Please try again.");
     }
@@ -74,7 +80,7 @@ export default function ActivitySection({ batchId, batchStatus }: Props) {
           batchId={batchId}
           activity={editing}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); refetch(); }}
+          onSaved={() => { setEditing(null); refresh(); }}
         />
       )}
 

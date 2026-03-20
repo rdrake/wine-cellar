@@ -5,7 +5,6 @@ import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { GravitySparkline, TemperatureSparkline } from "@/components/Sparkline";
 import {
   Dialog,
   DialogContent,
@@ -15,60 +14,142 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import type { Batch } from "@/types";
+import type { Batch, Reading, Device } from "@/types";
 import { STAGE_LABELS, WINE_TYPE_LABELS, SOURCE_MATERIAL_LABELS, STATUS_LABELS } from "@/types";
 import ActivitySection from "@/components/ActivitySection";
 import ReadingsChart from "@/components/ReadingsChart";
 import DeviceSection from "@/components/DeviceSection";
-import BatchStats from "@/components/BatchStats";
 import ExportButton from "@/components/ExportButton";
-import type { Reading } from "@/types";
-import { attenuation } from "@/lib/fermentation";
+import { abv, attenuation, velocity, tempStats, daysSince, projectedDaysToTarget } from "@/lib/fermentation";
 
-function SparklineSummary({ readings }: { readings: Reading[] }) {
-  if (readings.length < 2) return null;
+// ── Helpers ──────────────────────────────────────────────────────────
 
-  const gravities = readings.map((r: Reading) => r.gravity);
-  const temps = readings.map((r: Reading) => r.temperature).filter((t): t is number => t != null);
-  const first = readings[0];
-  const last = readings[readings.length - 1];
-  const og = first.gravity;
-  const sg = last.gravity;
-  const att = og !== sg ? attenuation(og, sg) : 0;
+function relativeTime(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days}d ago`;
+  return new Date(isoDate).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
+// ── Snapshot Card ────────────────────────────────────────────────────
+
+function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
-    <div className="py-2 space-y-1">
-      <div className="flex items-center gap-3">
-        <GravitySparkline values={gravities} width={180} height={28} />
-        <span className="text-sm tabular-nums">
-          <span className="font-semibold">{sg.toFixed(3)}</span>
-          <span className="text-muted-foreground text-xs"> SG</span>
-        </span>
-        {att > 0 && (
-          <span className="text-sm tabular-nums">
-            <span className="font-semibold">{att.toFixed(0)}</span>
-            <span className="text-muted-foreground text-xs">%</span>
-          </span>
-        )}
-      </div>
-      {temps.length >= 2 && (
-        <div className="flex items-center gap-3">
-          <TemperatureSparkline values={temps} width={180} height={28} />
-          <span className="text-sm tabular-nums">
-            <span className="font-semibold">{temps[temps.length - 1].toFixed(1)}</span>
-            <span className="text-muted-foreground text-xs">{"\u00B0C"}</span>
-          </span>
-        </div>
-      )}
-      <p className="text-xs text-muted-foreground tabular-nums">
-        {og.toFixed(3)} → {sg.toFixed(3)}
-        {" · "}{readings.length} readings
-      </p>
+    <div className="flex justify-between items-baseline">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm font-semibold tabular-nums">
+        {value}
+        {unit && <span className="text-xs font-normal text-muted-foreground ml-0.5">{unit}</span>}
+      </span>
     </div>
   );
 }
 
-function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onAction: () => void; onDeleted: () => void }) {
+function BatchSnapshot({ batch, readings, device }: {
+  batch: Batch;
+  readings: Reading[];
+  device: Device | null;
+}) {
+  const sorted = readings.length >= 2
+    ? [...readings].sort((a, b) => new Date(a.source_timestamp).getTime() - new Date(b.source_timestamp).getTime())
+    : null;
+
+  const latest = sorted ? sorted[sorted.length - 1] : null;
+  const og = sorted ? sorted[0].gravity : null;
+  const sg = latest?.gravity ?? null;
+  const currentAbv = og && sg ? abv(og, sg) : null;
+  const att = og && sg ? attenuation(og, sg) : null;
+  const vel = sorted ? velocity(sorted) : null;
+  const temps = sorted ? tempStats(sorted) : null;
+  const days = daysSince(batch.started_at);
+  const proj = vel !== null && sg !== null ? projectedDaysToTarget(sg, 0.996, vel) : null;
+
+  return (
+    <Card>
+      <CardContent className="p-3 space-y-1">
+        {/* Current readings — the freshest data first */}
+        {latest ? (
+          <>
+            <div className="flex justify-between items-baseline">
+              <span className="text-xs text-muted-foreground">Current SG</span>
+              <span className="text-sm font-semibold tabular-nums">
+                {sg!.toFixed(3)}
+                <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                  {relativeTime(latest.source_timestamp)} · {latest.source}
+                </span>
+              </span>
+            </div>
+            {latest.temperature != null && (
+              <Stat label="Temperature" value={latest.temperature.toFixed(1)} unit={"\u00B0C"} />
+            )}
+            {currentAbv != null && <Stat label="Est. ABV" value={currentAbv.toFixed(1)} unit="%" />}
+            {att != null && <Stat label="Attenuation" value={att.toFixed(0)} unit="%" />}
+            <Stat label="OG \u2192 SG" value={`${og!.toFixed(3)} \u2192 ${sg!.toFixed(3)}`} />
+            {vel !== null && (
+              <Stat
+                label="Gravity change (48h)"
+                value={`${vel > 0 ? "+" : ""}${(vel * 1000).toFixed(1)}`}
+                unit="pts/day"
+              />
+            )}
+            {proj !== null && proj > 0 && (
+              <Stat label="Est. days to dry (0.996)" value={String(proj)} unit="d" />
+            )}
+            {temps && (
+              <Stat label="Temp range" value={`${temps.min.toFixed(1)}\u2013${temps.max.toFixed(1)}`} unit={"\u00B0C"} />
+            )}
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">No readings yet</p>
+        )}
+
+        {/* Batch metadata */}
+        <div className="border-t pt-1 mt-1" />
+        <Stat label="Day" value={String(days)} />
+        {batch.volume_liters != null && (
+          <Stat
+            label="Volume"
+            value={batch.target_volume_liters
+              ? `${batch.volume_liters} / ${batch.target_volume_liters}`
+              : String(batch.volume_liters)}
+            unit="L"
+          />
+        )}
+        <Stat label="Started" value={new Date(batch.started_at).toLocaleDateString()} />
+        {batch.completed_at && (
+          <Stat label="Completed" value={new Date(batch.completed_at).toLocaleDateString()} />
+        )}
+        {sorted && <Stat label="Readings" value={String(sorted.length)} />}
+
+        {/* Device status */}
+        {device && (
+          <>
+            <div className="border-t pt-1 mt-1" />
+            <div className="flex justify-between items-baseline">
+              <span className="text-xs text-muted-foreground">Device</span>
+              <span className="text-sm font-semibold">{device.name}</span>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Lifecycle Actions ────────────────────────────────────────────────
+
+function LifecycleActions({ batch, batchId, onAction, onDeleted }: {
+  batch: Batch;
+  batchId: string;
+  onAction: () => void;
+  onDeleted: () => void;
+}) {
   const [confirmAction, setConfirmAction] = useState<{ label: string; verb: string; verbing: string; action: () => Promise<void> } | null>(null);
   const [acting, setActing] = useState(false);
 
@@ -101,6 +182,9 @@ function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onActi
             <Button size="sm" variant="outline" onClick={() => doAction("Batch completed", () => api.batches.complete(batch.id))}>
               Complete
             </Button>
+            <Link to={`/batches/${batchId}/activities/new`}>
+              <Button size="sm" variant="outline">+ Log Activity</Button>
+            </Link>
             <Button size="sm" variant="destructive" onClick={() => confirm("Abandon batch?", "Abandon", "Abandoning...", () => api.batches.abandon(batch.id))}>
               Abandon
             </Button>
@@ -163,23 +247,37 @@ function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onActi
   );
 }
 
+// ── Page ─────────────────────────────────────────────────────────────
+
 export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [notesOpen, setNotesOpen] = useState(false);
 
   const { data: batch, loading, error, refetch } = useFetch(
     () => api.batches.get(id!),
     [id],
   );
 
-  const { data: readingsData } = useFetch(
+  const { data: readingsData, refetch: refetchReadings } = useFetch(
     () => api.readings.listByBatch(id!, { limit: 500 }),
     [id],
   );
 
+  const { data: activitiesData, refetch: refetchActivities } = useFetch(
+    () => api.activities.list(id!),
+    [id],
+  );
+
+  const { data: devicesData } = useFetch(
+    () => api.devices.list(),
+    [id],
+  );
+
+  const assignedDevice = devicesData?.items.find((d) => d.batch_id === id) ?? null;
+
   return (
     <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-6">
-      {/* Header — shows loading/error state */}
       {loading && <p className="text-muted-foreground">Loading batch details...</p>}
       {error && (
         <div className="text-destructive">
@@ -190,6 +288,7 @@ export default function BatchDetail() {
 
       {batch && (
         <>
+          {/* 1. Header — name, type, stage, status */}
           <div>
             <div className="flex justify-between items-start">
               <div>
@@ -198,57 +297,66 @@ export default function BatchDetail() {
                   {WINE_TYPE_LABELS[batch.wine_type]} &middot; {SOURCE_MATERIAL_LABELS[batch.source_material]}
                 </p>
               </div>
-              <div className="flex gap-2 items-center">
+              <div className="flex gap-1.5 items-center">
+                <Badge variant="outline">{STAGE_LABELS[batch.stage]}</Badge>
                 <Badge>{STATUS_LABELS[batch.status]}</Badge>
-                <ExportButton batch={batch} />
-                <Link to={`/batches/${id}/edit`}>
-                  <Button size="sm" variant="ghost">Edit</Button>
-                </Link>
               </div>
             </div>
-
-            <SparklineSummary readings={readingsData?.items.slice().reverse() ?? []} />
-            <BatchStats batch={batch} readings={readingsData?.items ?? []} />
-
-            <Card className="mt-3">
-              <CardContent className="p-3 text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Stage</span>
-                  <span>{STAGE_LABELS[batch.stage]}</span>
-                </div>
-                {batch.volume_liters && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Current volume</span>
-                    <span>{batch.volume_liters} L</span>
-                  </div>
-                )}
-                {batch.target_volume_liters && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Target volume</span>
-                    <span>{batch.target_volume_liters} L</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Started</span>
-                  <span>{new Date(batch.started_at).toLocaleDateString()}</span>
-                </div>
-                {batch.notes && <p className="pt-2 text-muted-foreground">{batch.notes}</p>}
-              </CardContent>
-            </Card>
+            {/* Secondary actions — demoted */}
+            <div className="flex gap-2 mt-2">
+              <Link to={`/batches/${id}/edit`}>
+                <Button size="sm" variant="ghost" className="h-7 text-xs">Edit</Button>
+              </Link>
+              <ExportButton batch={batch} />
+            </div>
           </div>
 
-          {/* Lifecycle Actions */}
-          <LifecycleActions batch={batch} onAction={refetch} onDeleted={() => navigate("/")} />
+          {/* 2. Snapshot card — merged stats + metadata + device */}
+          <BatchSnapshot
+            batch={batch}
+            readings={readingsData?.items ?? []}
+            device={assignedDevice}
+          />
+
+          {/* 3. Readings chart — hero visual */}
+          <ReadingsChart
+            readings={readingsData?.items.slice().reverse() ?? []}
+            activities={activitiesData?.items}
+            batchStartedAt={batch.started_at}
+            loading={!readingsData && !error}
+            error={null}
+          />
+
+          {/* 4. Primary actions — promoted */}
+          <LifecycleActions
+            batch={batch}
+            batchId={id!}
+            onAction={refetch}
+            onDeleted={() => navigate("/")}
+          />
         </>
       )}
 
-      {/* These sections mount immediately and fetch in parallel with the batch */}
-      <ActivitySection batchId={id!} batchStatus={batch?.status ?? "active"} />
-      <ReadingsChart
-        readings={readingsData?.items.slice().reverse() ?? []}
-        loading={!readingsData && !error}
-        error={null}
-      />
+      {/* 5. Activity timeline */}
+      <ActivitySection batchId={id!} batchStatus={batch?.status ?? "active"} onChanged={() => { refetchActivities(); refetchReadings(); }} />
+
+      {/* 6. Notes — collapsed reference */}
+      {batch?.notes && (
+        <section>
+          <button
+            className="flex items-center gap-1 text-sm font-semibold w-full text-left"
+            onClick={() => setNotesOpen(!notesOpen)}
+          >
+            <span className="text-muted-foreground">{notesOpen ? "\u25BC" : "\u25B6"}</span>
+            Batch Notes
+          </button>
+          {notesOpen && (
+            <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{batch.notes}</p>
+          )}
+        </section>
+      )}
+
+      {/* 7. Device management */}
       <DeviceSection batchId={id!} batchStatus={batch?.status ?? "active"} onAssignmentChange={refetch} />
     </div>
   );

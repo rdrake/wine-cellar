@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ActivityType } from "@/types";
 
@@ -121,6 +122,17 @@ export default function DetailFields({ type, details, onChange }: {
         </>
       );
     case "note":
-      return null;
+      return (
+        <div className="space-y-2">
+          <Label>Note</Label>
+          <Textarea
+            rows={3}
+            placeholder="Observations, reminders, or anything worth recording"
+            value={details.body ?? ""}
+            onChange={(e) => set("body", e.target.value)}
+            required
+          />
+        </div>
+      );
   }
 }
