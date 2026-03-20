@@ -4,7 +4,8 @@ import { useFetch } from "@/hooks/useFetch";
 import { GravitySparkline, TemperatureSparkline } from "@/components/Sparkline";
 import { STAGE_LABELS, WINE_TYPE_LABELS } from "@/types";
 import type { BatchSummary } from "@/types";
-import { attenuation } from "@/lib/fermentation";
+import { attenuation, detectStall } from "@/lib/fermentation";
+import { Badge } from "@/components/ui/badge";
 
 function BatchRow({ batch }: { batch: BatchSummary }) {
   const og = batch.first_reading?.gravity;
@@ -14,6 +15,11 @@ function BatchRow({ batch }: { batch: BatchSummary }) {
   const temps = batch.sparkline
     .map((p) => (p as any).temp as number | null)
     .filter((t): t is number => t != null);
+  const pseudoReadings = batch.sparkline.map((p) => ({
+    gravity: p.g,
+    source_timestamp: p.t,
+  }));
+  const stallReason = detectStall(pseudoReadings);
 
   return (
     <Link to={`/batches/${batch.id}`} className="block active:bg-accent/50 -mx-4 px-4 py-3 transition-colors">
@@ -40,6 +46,16 @@ function BatchRow({ batch }: { batch: BatchSummary }) {
                 <span className="font-semibold">{att.toFixed(0)}</span>
                 <span className="text-muted-foreground text-xs">% att</span>
               </span>
+            )}
+            {batch.velocity !== null && batch.velocity !== 0 && (
+              <span className="text-xs text-muted-foreground">
+                {(batch.velocity * 1000).toFixed(1)} pts/d
+              </span>
+            )}
+            {stallReason && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                Stall
+              </Badge>
             )}
           </div>
           {/* Temperature line */}
