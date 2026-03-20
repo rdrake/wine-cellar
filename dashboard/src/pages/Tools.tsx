@@ -2,11 +2,21 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 
-function useField(initial: string) {
+function useField(initial: number) {
   const [value, setValue] = useState(initial);
-  const num = parseFloat(value);
-  return { value, set: (e: React.ChangeEvent<HTMLInputElement>) => setValue(e.target.value), num, ok: !isNaN(num) && value !== "" };
+  const [text, setText] = useState(String(initial));
+  function setFromText(e: React.ChangeEvent<HTMLInputElement>) {
+    setText(e.target.value);
+    const n = parseFloat(e.target.value);
+    if (!isNaN(n)) setValue(n);
+  }
+  function setFromSlider(v: number) {
+    setValue(v);
+    setText(String(v));
+  }
+  return { value, text, setFromText, setFromSlider, ok: !isNaN(value) };
 }
 
 function Result({ label, value, unit }: { label: string; value: string; unit?: string }) {
@@ -21,11 +31,27 @@ function Result({ label, value, unit }: { label: string; value: string; unit?: s
   );
 }
 
-function Field({ id, label, step, ...props }: { id: string; label: string; step: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
+function SliderField({ id, label, min, max, step, value, text, onSlider, onInput }: {
+  id: string; label: string; min: number; max: number; step: number;
+  value: number; text: string;
+  onSlider: (v: number) => void;
+  onInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
   return (
-    <div>
-      <Label htmlFor={id} className="text-xs">{label}</Label>
-      <Input id={id} type="number" step={step} inputMode="decimal" className="mt-0.5" {...props} />
+    <div className="space-y-1.5">
+      <div className="flex justify-between items-baseline">
+        <Label htmlFor={id} className="text-xs">{label}</Label>
+        <Input
+          id={id} type="number" step={step} inputMode="decimal"
+          value={text} onChange={onInput}
+          className="w-20 h-7 text-xs text-right tabular-nums"
+        />
+      </div>
+      <Slider
+        min={min} max={max} step={step}
+        value={[value]}
+        onValueChange={(v) => onSlider(Array.isArray(v) ? v[0] : v)}
+      />
     </div>
   );
 }
@@ -33,22 +59,22 @@ function Field({ id, label, step, ...props }: { id: string; label: string; step:
 // ─── ABV Calculator ────────────────────────────────────────────────
 
 function ABVCalculator() {
-  const og = useField("1.090");
-  const fg = useField("0.996");
+  const og = useField(1.09);
+  const fg = useField(0.996);
 
-  const abv = og.ok && fg.ok ? (og.num - fg.num) * 131.25 : null;
-  const att = og.ok && fg.ok && og.num > 1
-    ? ((og.num - fg.num) / (og.num - 1)) * 100
+  const abv = og.ok && fg.ok ? (og.value - fg.value) * 131.25 : null;
+  const att = og.ok && fg.ok && og.value > 1
+    ? Math.min(100, ((og.value - fg.value) / (og.value - 1)) * 100)
     : null;
 
   return (
     <Card>
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="p-4 space-y-4">
         <h2 className="font-heading font-semibold">ABV</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <Field id="abv-og" label="Original Gravity" step="0.001" value={og.value} onChange={og.set} />
-          <Field id="abv-fg" label="Final Gravity" step="0.001" value={fg.value} onChange={fg.set} />
-        </div>
+        <SliderField id="abv-og" label="Original Gravity" min={1.0} max={1.16} step={0.001}
+          value={og.value} text={og.text} onSlider={og.setFromSlider} onInput={og.setFromText} />
+        <SliderField id="abv-fg" label="Final Gravity" min={0.98} max={1.06} step={0.001}
+          value={fg.value} text={fg.text} onSlider={fg.setFromSlider} onInput={fg.setFromText} />
         {abv !== null && abv >= 0 && (
           <div className="border-t pt-2 space-y-0.5">
             <Result label="ABV" value={abv.toFixed(1)} unit="%" />
@@ -63,24 +89,24 @@ function ABVCalculator() {
 // ─── Chaptalization Calculator ─────────────────────────────────────
 
 function ChaptalizationCalculator() {
-  const vol = useField("23");
-  const current = useField("1.050");
-  const target = useField("1.080");
+  const vol = useField(23);
+  const current = useField(1.05);
+  const target = useField(1.08);
 
-  // ~2.65 g sucrose per liter per gravity point
-  const pts = current.ok && target.ok ? (target.num - current.num) * 1000 : null;
-  const sugar = pts !== null && pts > 0 && vol.ok ? vol.num * pts * 2.65 : null;
+  const pts = current.ok && target.ok ? (target.value - current.value) * 1000 : null;
+  const sugar = pts !== null && pts > 0 && vol.ok ? vol.value * pts * 2.65 : null;
 
   return (
     <Card>
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="p-4 space-y-4">
         <h2 className="font-heading font-semibold">Chaptalization</h2>
-        <p className="text-xs text-muted-foreground">Sugar addition to raise specific gravity</p>
-        <div className="grid grid-cols-3 gap-3">
-          <Field id="chap-vol" label="Volume (L)" step="0.1" value={vol.value} onChange={vol.set} />
-          <Field id="chap-cur" label="Current SG" step="0.001" value={current.value} onChange={current.set} />
-          <Field id="chap-tgt" label="Target SG" step="0.001" value={target.value} onChange={target.set} />
-        </div>
+        <p className="text-xs text-muted-foreground -mt-2">Sugar addition to raise specific gravity</p>
+        <SliderField id="chap-vol" label="Volume (L)" min={1} max={100} step={0.5}
+          value={vol.value} text={vol.text} onSlider={vol.setFromSlider} onInput={vol.setFromText} />
+        <SliderField id="chap-cur" label="Current SG" min={1.0} max={1.16} step={0.001}
+          value={current.value} text={current.text} onSlider={current.setFromSlider} onInput={current.setFromText} />
+        <SliderField id="chap-tgt" label="Target SG" min={1.0} max={1.16} step={0.001}
+          value={target.value} text={target.text} onSlider={target.setFromSlider} onInput={target.setFromText} />
         {sugar !== null && (
           <div className="border-t pt-2 space-y-0.5">
             <Result
@@ -104,30 +130,30 @@ function ChaptalizationCalculator() {
 // ─── Sulfite Calculator ────────────────────────────────────────────
 
 function SulfiteCalculator() {
-  const vol = useField("23");
-  const ph = useField("3.40");
-  const target = useField("30");
-  const current = useField("0");
+  const vol = useField(23);
+  const ph = useField(3.4);
+  const target = useField(30);
+  const current = useField(0);
 
-  const delta = target.ok && current.ok ? target.num - current.num : null;
-  // KMS is 57.6% SO₂ by weight; 1 ppm = 1 mg/L
-  const kms = delta !== null && delta > 0 && vol.ok ? (delta * vol.num) / 576 : null;
-  // Molecular SO₂ = free SO₂ / (1 + 10^(pH − 1.81))
+  const delta = target.ok && current.ok ? target.value - current.value : null;
+  const kms = delta !== null && delta > 0 && vol.ok ? (delta * vol.value) / 576 : null;
   const molSO2 = ph.ok && target.ok
-    ? target.num / (1 + Math.pow(10, ph.num - 1.81))
+    ? target.value / (1 + Math.pow(10, ph.value - 1.81))
     : null;
 
   return (
     <Card>
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="p-4 space-y-4">
         <h2 className="font-heading font-semibold">Sulfite Addition</h2>
-        <p className="text-xs text-muted-foreground">Potassium metabisulfite (KMS) dosing</p>
-        <div className="grid grid-cols-2 gap-3">
-          <Field id="so2-vol" label="Volume (L)" step="0.1" value={vol.value} onChange={vol.set} />
-          <Field id="so2-ph" label="pH" step="0.01" value={ph.value} onChange={ph.set} />
-          <Field id="so2-tgt" label="Target Free SO₂ (ppm)" step="1" value={target.value} onChange={target.set} />
-          <Field id="so2-cur" label="Current Free SO₂ (ppm)" step="1" value={current.value} onChange={current.set} />
-        </div>
+        <p className="text-xs text-muted-foreground -mt-2">Potassium metabisulfite (KMS) dosing</p>
+        <SliderField id="so2-vol" label="Volume (L)" min={1} max={100} step={0.5}
+          value={vol.value} text={vol.text} onSlider={vol.setFromSlider} onInput={vol.setFromText} />
+        <SliderField id="so2-ph" label="pH" min={2.8} max={4.2} step={0.01}
+          value={ph.value} text={ph.text} onSlider={ph.setFromSlider} onInput={ph.setFromText} />
+        <SliderField id="so2-tgt" label="Target Free SO₂ (ppm)" min={0} max={100} step={1}
+          value={target.value} text={target.text} onSlider={target.setFromSlider} onInput={target.setFromText} />
+        <SliderField id="so2-cur" label="Current Free SO₂ (ppm)" min={0} max={100} step={1}
+          value={current.value} text={current.text} onSlider={current.setFromSlider} onInput={current.setFromText} />
         {kms !== null && (
           <div className="border-t pt-2 space-y-0.5">
             <Result label="KMS to Add" value={kms.toFixed(2)} unit="g" />
@@ -148,8 +174,6 @@ function SulfiteCalculator() {
 
 // ─── Hydrometer Temperature Correction ─────────────────────────────
 
-// Standard correction table for sugar solutions, calibrated at 20 °C.
-// Values are SG points to add at each temperature.
 const TEMP_CORRECTIONS: [number, number][] = [
   [0, -0.0017], [5, -0.0014], [10, -0.0008], [15, -0.0003],
   [20, 0.0000], [25, 0.0011], [30, 0.0025], [35, 0.0041], [40, 0.0060],
@@ -167,25 +191,26 @@ function tempCorrection(t: number): number {
 }
 
 function TempCorrectionCalculator() {
-  const sg = useField("1.050");
-  const temp = useField("25");
-  const cal = useField("20");
+  const sg = useField(1.05);
+  const temp = useField(25);
+  const cal = useField(20);
 
   const corrected = sg.ok && temp.ok && cal.ok
-    ? sg.num + tempCorrection(temp.num) - tempCorrection(cal.num)
+    ? sg.value + tempCorrection(temp.value) - tempCorrection(cal.value)
     : null;
-  const delta = corrected !== null ? corrected - sg.num : null;
+  const delta = corrected !== null ? corrected - sg.value : null;
 
   return (
     <Card>
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="p-4 space-y-4">
         <h2 className="font-heading font-semibold">Hydrometer Correction</h2>
-        <p className="text-xs text-muted-foreground">Correct SG reading for sample temperature</p>
-        <div className="grid grid-cols-3 gap-3">
-          <Field id="tc-sg" label="Observed SG" step="0.001" value={sg.value} onChange={sg.set} />
-          <Field id="tc-temp" label="Sample °C" step="0.5" value={temp.value} onChange={temp.set} />
-          <Field id="tc-cal" label="Cal. °C" step="0.5" value={cal.value} onChange={cal.set} />
-        </div>
+        <p className="text-xs text-muted-foreground -mt-2">Correct SG reading for sample temperature</p>
+        <SliderField id="tc-sg" label="Observed SG" min={0.99} max={1.16} step={0.001}
+          value={sg.value} text={sg.text} onSlider={sg.setFromSlider} onInput={sg.setFromText} />
+        <SliderField id="tc-temp" label="Sample °C" min={0} max={40} step={0.5}
+          value={temp.value} text={temp.text} onSlider={temp.setFromSlider} onInput={temp.setFromText} />
+        <SliderField id="tc-cal" label="Calibration °C" min={10} max={25} step={0.5}
+          value={cal.value} text={cal.text} onSlider={cal.setFromSlider} onInput={cal.setFromText} />
         {corrected !== null && (
           <div className="border-t pt-2 space-y-0.5">
             <Result label="Corrected SG" value={corrected.toFixed(4)} />

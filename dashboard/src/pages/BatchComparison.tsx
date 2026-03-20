@@ -181,9 +181,9 @@ export default function BatchComparison() {
               />
               <Tooltip
                 labelFormatter={(v) => `${Number(v).toFixed(1)} hours`}
-                formatter={(value: number, name: string) => {
-                  const batch = batchById.get(name);
-                  return [value.toFixed(4), batch?.name ?? name];
+                formatter={(value, name) => {
+                  const batch = batchById.get(String(name));
+                  return [Number(value).toFixed(4), batch?.name ?? String(name)];
                 }}
               />
               {selectedIds.map((id, i) => (

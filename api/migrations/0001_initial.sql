@@ -42,14 +42,14 @@ CREATE TABLE readings (
     batch_id TEXT REFERENCES batches(id) ON DELETE CASCADE,
     device_id TEXT NOT NULL,
     gravity REAL NOT NULL,
-    temperature REAL NOT NULL,
-    battery REAL NOT NULL,
-    rssi REAL NOT NULL,
+    temperature REAL,
+    battery REAL,
+    rssi REAL,
     source_timestamp TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX idx_readings_dedupe ON readings(device_id, source_timestamp);
+CREATE UNIQUE INDEX idx_readings_dedupe ON readings(device_id, source_timestamp, COALESCE(batch_id, ''));
 CREATE INDEX idx_readings_batch_pagination ON readings(batch_id, source_timestamp DESC, id DESC);
 
 -- Devices table

@@ -15,7 +15,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="flex items-center justify-between px-4 py-3">
+      <header className="flex items-center justify-between px-4 py-3" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <h1 className="font-heading text-lg tracking-tight text-primary">Wine Cellar</h1>
         <div className="flex items-center gap-1">
           <ThemeToggle />

@@ -14,6 +14,18 @@ interface Props {
   batchId: string;
 }
 
+function toEpoch(ts: string) {
+  return new Date(ts).getTime();
+}
+
+function fmtDate(ms: number) {
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function fmtDateTime(ms: number) {
+  return new Date(ms).toLocaleString();
+}
+
 export default function ReadingsChart({ batchId }: Props) {
   const { data, loading, error } = useFetch(
     () => api.readings.listByBatch(batchId, { limit: 500 }),
@@ -21,9 +33,24 @@ export default function ReadingsChart({ batchId }: Props) {
   );
 
   const all = data?.items.slice().reverse() ?? [];
-  const device = all.filter((r) => r.source !== "manual");
-  const manual = all.filter((r) => r.source === "manual");
+
+  // Convert to epoch for proper time axis
+  const device = all
+    .filter((r) => r.source !== "manual")
+    .map((r) => ({ ...r, t: toEpoch(r.source_timestamp) }));
+  const manual = all
+    .filter((r) => r.source === "manual")
+    .map((r) => ({ ...r, t: toEpoch(r.source_timestamp) }));
+
   const hasTemp = device.some((r) => r.temperature != null);
+
+  // Compute time domain from all readings
+  const allTimes = all.map((r) => toEpoch(r.source_timestamp));
+  const tMin = allTimes.length > 0 ? Math.min(...allTimes) : 0;
+  const tMax = allTimes.length > 0 ? Math.max(...allTimes) : 0;
+  // Add 2% padding on each side
+  const pad = Math.max((tMax - tMin) * 0.02, 3600000); // at least 1 hour
+  const domain: [number, number] = [tMin - pad, tMax + pad];
 
   return (
     <section>
@@ -45,11 +72,13 @@ export default function ReadingsChart({ batchId }: Props) {
               <ComposedChart margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis
-                  dataKey="source_timestamp"
-                  type="category"
+                  dataKey="t"
+                  type="number"
+                  scale="time"
+                  domain={domain}
                   allowDuplicatedCategory={false}
                   tick={{ fontSize: 10 }}
-                  tickFormatter={(v: string) => new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  tickFormatter={(v: number) => fmtDate(v)}
                 />
                 <YAxis
                   yAxisId="gravity"
@@ -68,7 +97,7 @@ export default function ReadingsChart({ batchId }: Props) {
                   />
                 )}
                 <Tooltip
-                  labelFormatter={(v) => new Date(String(v)).toLocaleString()}
+                  labelFormatter={(v) => fmtDateTime(Number(v))}
                   formatter={(value, name) => {
                     const v = Number(value);
                     if (name === "temperature") return [`${v.toFixed(1)}\u00B0C`, "Temp"];
