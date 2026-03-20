@@ -20,16 +20,12 @@ import { STAGE_LABELS, WINE_TYPE_LABELS, SOURCE_MATERIAL_LABELS, STATUS_LABELS }
 import ActivitySection from "@/components/ActivitySection";
 import ReadingsChart from "@/components/ReadingsChart";
 import DeviceSection from "@/components/DeviceSection";
+import BatchStats from "@/components/BatchStats";
+import ExportButton from "@/components/ExportButton";
 import type { Reading } from "@/types";
 import { attenuation } from "@/lib/fermentation";
 
-function SparklineSummary({ batchId }: { batchId: string }) {
-  const { data } = useFetch(
-    () => api.readings.listByBatch(batchId, { limit: 200 }),
-    [batchId],
-  );
-
-  const readings = data?.items.slice().reverse() ?? [];
+function SparklineSummary({ readings }: { readings: Reading[] }) {
   if (readings.length < 2) return null;
 
   const gravities = readings.map((r: Reading) => r.gravity);
@@ -174,6 +170,11 @@ export default function BatchDetail() {
     [id],
   );
 
+  const { data: readingsData } = useFetch(
+    () => api.readings.listByBatch(id!, { limit: 500 }),
+    [id],
+  );
+
   return (
     <div className="p-4 max-w-lg mx-auto space-y-6">
       {/* Header — shows loading/error state */}
@@ -197,13 +198,15 @@ export default function BatchDetail() {
               </div>
               <div className="flex gap-2 items-center">
                 <Badge>{STATUS_LABELS[batch.status]}</Badge>
+                <ExportButton batch={batch} />
                 <Link to={`/batches/${id}/edit`}>
                   <Button size="sm" variant="ghost">Edit</Button>
                 </Link>
               </div>
             </div>
 
-            <SparklineSummary batchId={id!} />
+            <SparklineSummary readings={readingsData?.items.slice().reverse() ?? []} />
+            <BatchStats batch={batch} readings={readingsData?.items ?? []} />
 
             <Card className="mt-3">
               <CardContent className="p-3 text-sm space-y-1">
