@@ -70,7 +70,7 @@ function CollapsibleCard({ title, description, defaultOpen = false, children }: 
           <h2 className="font-heading font-semibold">{title}</h2>
           {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
-        <span className={cn("text-muted-foreground transition-transform", open && "rotate-180")}>▾</span>
+        <span className={cn("text-muted-foreground text-xl transition-transform", open && "rotate-180")}>▾</span>
       </button>
       {open && <CardContent className="p-4 pt-0 space-y-4">{children}</CardContent>}
     </Card>
