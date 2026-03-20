@@ -4,15 +4,12 @@ import { useFetch } from "@/hooks/useFetch";
 import { GravitySparkline, TemperatureSparkline } from "@/components/Sparkline";
 import { STAGE_LABELS, WINE_TYPE_LABELS } from "@/types";
 import type { BatchSummary } from "@/types";
-
-function apparentAttenuation(og: number, sg: number): number {
-  return ((og - sg) / (og - 1)) * 100;
-}
+import { attenuation } from "@/lib/fermentation";
 
 function BatchRow({ batch }: { batch: BatchSummary }) {
   const og = batch.first_reading?.gravity;
   const sg = batch.latest_reading?.gravity;
-  const att = og && sg ? apparentAttenuation(og, sg) : null;
+  const att = og && sg ? attenuation(og, sg) : null;
   const gravities = batch.sparkline.map((p) => p.g);
   const temps = batch.sparkline
     .map((p) => (p as any).temp as number | null)

@@ -21,6 +21,7 @@ import ActivitySection from "@/components/ActivitySection";
 import ReadingsChart from "@/components/ReadingsChart";
 import DeviceSection from "@/components/DeviceSection";
 import type { Reading } from "@/types";
+import { attenuation } from "@/lib/fermentation";
 
 function SparklineSummary({ batchId }: { batchId: string }) {
   const { data } = useFetch(
@@ -37,7 +38,7 @@ function SparklineSummary({ batchId }: { batchId: string }) {
   const last = readings[readings.length - 1];
   const og = first.gravity;
   const sg = last.gravity;
-  const att = og !== sg ? ((og - sg) / (og - 1)) * 100 : 0;
+  const att = og !== sg ? attenuation(og, sg) : 0;
 
   return (
     <div className="py-2 space-y-1">
