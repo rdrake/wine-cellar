@@ -21,7 +21,12 @@ export default function BatchList() {
 
   return (
     <div className="p-4 max-w-lg mx-auto">
-      <h1 className="font-heading text-xl font-bold mb-4">Batches</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="font-heading text-xl font-bold">Batches</h1>
+        <Link to="/compare">
+          <Button size="sm" variant="outline">Compare</Button>
+        </Link>
+      </div>
 
       <Tabs value={status} onValueChange={(v) => setStatus(v as BatchStatus)}>
         <TabsList className="w-full">
