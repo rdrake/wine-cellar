@@ -142,7 +142,7 @@ export default function ReadingsChart({ readings, activities, batchStartedAt, lo
         <>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
+              <ComposedChart margin={{ top: 12, right: 5, bottom: 5, left: 0 }}>
                 <XAxis
                   dataKey="t"
                   type="number"
@@ -186,11 +186,6 @@ export default function ReadingsChart({ readings, activities, batchStartedAt, lo
                     stroke={ACTIVITY_COLORS[a.type] ?? colors.mutedForeground}
                     strokeDasharray="4 3"
                     strokeWidth={1}
-                    label={{
-                      value: a.title.length > 20 ? a.title.slice(0, 18) + "…" : a.title,
-                      position: "insideTopRight",
-                      style: { fontSize: 9, fill: colors.mutedForeground },
-                    }}
                   />
                 ))}
                 {/* Device readings as a line */}
