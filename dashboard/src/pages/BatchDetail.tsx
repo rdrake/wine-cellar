@@ -3,8 +3,6 @@ import { useState } from "react";
 import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -71,8 +69,7 @@ function BatchSnapshot({ batch, readings, device }: {
   const proj = vel !== null && sg !== null ? projectedDaysToTarget(sg, 0.996, vel) : null;
 
   return (
-    <Card>
-      <CardContent className="p-3 space-y-1">
+    <div className="space-y-1">
         {/* Current readings — the freshest data first */}
         {latest ? (
           <>
@@ -110,7 +107,7 @@ function BatchSnapshot({ batch, readings, device }: {
         )}
 
         {/* Batch metadata */}
-        <div className="border-t pt-1 mt-1" />
+        <div className="pt-1 mt-1" />
         <Stat label="Day" value={String(days)} />
         {batch.volume_liters != null && (
           <Stat
@@ -130,15 +127,14 @@ function BatchSnapshot({ batch, readings, device }: {
         {/* Device status */}
         {device && (
           <>
-            <div className="border-t pt-1 mt-1" />
+            <div className="pt-1 mt-1" />
             <div className="flex justify-between items-baseline">
               <span className="text-xs text-muted-foreground">Device</span>
               <span className="text-sm font-semibold">{device.name}</span>
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 
@@ -277,7 +273,7 @@ export default function BatchDetail() {
   const assignedDevice = devicesData?.items.find((d) => d.batch_id === id) ?? null;
 
   return (
-    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-6">
+    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
       {loading && <p className="text-muted-foreground">Loading batch details...</p>}
       {error && (
         <div className="text-destructive">
@@ -297,9 +293,10 @@ export default function BatchDetail() {
                   {WINE_TYPE_LABELS[batch.wine_type]} &middot; {SOURCE_MATERIAL_LABELS[batch.source_material]}
                 </p>
               </div>
-              <div className="flex gap-1.5 items-center">
-                <Badge variant="outline">{STAGE_LABELS[batch.stage]}</Badge>
-                <Badge>{STATUS_LABELS[batch.status]}</Badge>
+              <div className="flex gap-1.5 items-baseline text-sm">
+                <span className="text-muted-foreground">{STAGE_LABELS[batch.stage]}</span>
+                <span className="text-muted-foreground">&middot;</span>
+                <span className="font-medium">{STATUS_LABELS[batch.status]}</span>
               </div>
             </div>
             {/* Secondary actions — demoted */}

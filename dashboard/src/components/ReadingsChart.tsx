@@ -6,12 +6,11 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  CartesianGrid,
   ReferenceLine,
 } from "recharts";
 import type { Reading, Activity } from "@/types";
 import { useChartColors } from "@/hooks/useChartColors";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type TimeRange = "7d" | "14d" | "all";
 
@@ -105,19 +104,20 @@ export default function ReadingsChart({ readings, activities, batchStartedAt, lo
   return (
     <section>
       <div className="flex items-center justify-between mb-2">
-        <h2 className="font-semibold">Readings</h2>
+        <h2 className="text-sm font-semibold">Readings</h2>
         {readings.length > 0 && (
-          <div className="flex gap-1">
+          <div className="flex gap-1 text-xs">
             {(["7d", "14d", "all"] as const).map((r) => (
-              <Button
+              <button
                 key={r}
-                size="sm"
-                variant={range === r ? "default" : "ghost"}
-                className="h-6 px-2 text-xs"
+                className={cn(
+                  "px-2 py-0.5 rounded transition-colors",
+                  range === r ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
                 onClick={() => setRange(r)}
               >
                 {r === "all" ? "All" : r.toUpperCase()}
-              </Button>
+              </button>
             ))}
           </div>
         )}
@@ -143,7 +143,6 @@ export default function ReadingsChart({ readings, activities, batchStartedAt, lo
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis
                   dataKey="t"
                   type="number"
@@ -158,7 +157,6 @@ export default function ReadingsChart({ readings, activities, batchStartedAt, lo
                   domain={[0.990, 1.125]}
                   tick={tickStyle}
                   tickFormatter={(v: number) => v.toFixed(3)}
-                  label={{ value: "SG", angle: -90, position: "insideLeft", style: { fontSize: 10, fill: colors.mutedForeground } }}
                 />
                 {hasTemp && (
                   <YAxis
@@ -166,7 +164,6 @@ export default function ReadingsChart({ readings, activities, batchStartedAt, lo
                     orientation="right"
                     domain={["auto", "auto"]}
                     tick={tickStyle}
-                    label={{ value: "\u00B0C", angle: 90, position: "insideRight", style: { fontSize: 10, fill: colors.mutedForeground } }}
                   />
                 )}
                 <Tooltip
@@ -241,30 +238,6 @@ export default function ReadingsChart({ readings, activities, batchStartedAt, lo
             </ResponsiveContainer>
           </div>
 
-          {/* Legend */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-muted-foreground">
-            {device.length > 0 && (
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-4 h-0.5 bg-chart-1" /> Device
-              </span>
-            )}
-            {manual.length > 0 && (
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-4 h-0.5 bg-chart-1 border-dashed border-t border-chart-1" />
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-chart-1 -ml-0.5" /> Manual
-              </span>
-            )}
-            {hasTemp && (
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-4 h-0.5 bg-chart-2" /> Temperature
-              </span>
-            )}
-            {markers.length > 0 && (
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-4 h-0 border-t border-dashed border-muted-foreground" /> Activity
-              </span>
-            )}
-          </div>
         </>
       )}
     </section>

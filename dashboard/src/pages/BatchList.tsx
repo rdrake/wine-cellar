@@ -38,7 +38,7 @@ export default function BatchList() {
         </TabsList>
       </Tabs>
 
-      <div className="mt-4 flex flex-col gap-4">
+      <div className="mt-4 divide-y divide-border">
         {loading && <p className="text-muted-foreground text-sm">Fetching your batches...</p>}
         {error && (
           <div className="text-sm text-destructive">

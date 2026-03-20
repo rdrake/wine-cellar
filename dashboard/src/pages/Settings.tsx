@@ -2,9 +2,7 @@ import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, getApiConfig, clearApiConfig } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { GravitySparkline } from "@/components/Sparkline";
 import {
   Dialog,
@@ -62,8 +60,7 @@ function DeviceCard({ device, batchName, onAssign, onUnassign }: {
   const latest: Reading | null = readings.length > 0 ? readings[readings.length - 1] : null;
 
   return (
-    <Card>
-      <CardContent className="p-3">
+    <div className="py-3">
         <div className="flex justify-between items-start">
           <div className="min-w-0">
             <p className="font-medium text-sm">{device.name}</p>
@@ -72,14 +69,14 @@ function DeviceCard({ device, batchName, onAssign, onUnassign }: {
           <div className="flex items-center gap-1.5 shrink-0">
             {device.batch_id ? (
               <>
-                <Badge variant="secondary" className="text-xs">Assigned</Badge>
+                <span className="text-xs font-medium text-foreground">Assigned</span>
                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onUnassign(device.id)}>
                   Unassign
                 </Button>
               </>
             ) : (
               <>
-                <Badge variant="outline" className="text-xs">Idle</Badge>
+                <span className="text-xs text-muted-foreground">Idle</span>
                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onAssign(device)}>
                   Assign
                 </Button>
@@ -132,8 +129,7 @@ function DeviceCard({ device, batchName, onAssign, onUnassign }: {
             <GravitySparkline values={readings.map((r) => r.gravity)} width={200} height={24} />
           </div>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 
@@ -217,8 +213,7 @@ function ConnectionSection() {
   }
 
   return (
-    <Card>
-      <CardContent className="p-3 space-y-2">
+    <div className="space-y-2">
         <div className="flex justify-between items-baseline">
           <span className="text-xs text-muted-foreground">API</span>
           <span className="text-xs font-mono truncate max-w-[200px]">{config.url ?? "Not configured"}</span>
@@ -233,8 +228,7 @@ function ConnectionSection() {
             Disconnect
           </Button>
         </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 
@@ -266,10 +260,10 @@ export default function Settings() {
   }
 
   return (
-    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-6">
+    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
       {/* Sensors */}
       <section>
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+        <h2 className="text-sm font-semibold mb-2">
           Sensors
         </h2>
         {loading && <p className="text-sm text-muted-foreground">Loading devices...</p>}
@@ -284,7 +278,7 @@ export default function Settings() {
             No sensors registered. Devices appear automatically when your RAPT Pill sends its first reading.
           </p>
         )}
-        <div className="space-y-2">
+        <div className="divide-y divide-border">
           {devicesData?.items.map((device) => (
             <DeviceCard
               key={device.id}
@@ -299,7 +293,7 @@ export default function Settings() {
 
       {/* Connection */}
       <section>
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+        <h2 className="text-sm font-semibold mb-2">
           Connection
         </h2>
         <ConnectionSection />

@@ -6,7 +6,6 @@ import { GravitySparkline, TemperatureSparkline } from "@/components/Sparkline";
 import { STAGE_LABELS, WINE_TYPE_LABELS, ACTIVITY_TYPE_LABELS } from "@/types";
 import type { BatchSummary, Activity } from "@/types";
 import { attenuation, detectStall } from "@/lib/fermentation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -17,15 +16,6 @@ const WINE_TYPE_COLORS: Record<string, string> = {
   orange: "bg-orange-400",
   sparkling: "bg-yellow-200",
   dessert: "bg-amber-700",
-};
-
-const ACTIVITY_TYPE_COLORS: Record<string, string> = {
-  addition: "bg-chart-3",
-  racking: "bg-chart-4",
-  measurement: "bg-chart-2",
-  tasting: "bg-chart-3",
-  adjustment: "bg-chart-5",
-  note: "bg-chart-2",
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -93,45 +83,22 @@ const ALERT_STYLES: Record<Alert["type"], string> = {
   temp_low: "text-blue-600 dark:text-blue-400",
 };
 
-const ALERT_ICONS: Record<Alert["type"], string> = {
-  stall: "\u26A0",     // ⚠
-  no_readings: "\u23F1", // ⏱
-  temp_high: "\uD83C\uDF21",  // 🌡
-  temp_low: "\u2744",  // ❄
-};
-
 // ── Summary Stats ────────────────────────────────────────────────────
 
 function SummaryStats({ batches }: { batches: BatchSummary[] }) {
   if (batches.length === 0) return null;
 
   const totalLiters = batches.reduce((sum, b) => sum + (b.volume_liters ?? 0), 0);
-  const stages = new Set(batches.map((b) => b.stage));
   const minDay = Math.min(...batches.map((b) => b.days_fermenting));
   const maxDay = Math.max(...batches.map((b) => b.days_fermenting));
-  const dayRange = minDay === maxDay ? `Day ${minDay}` : `Day ${minDay}–${maxDay}`;
+  const dayRange = minDay === maxDay ? `day ${minDay}` : `day ${minDay}–${maxDay}`;
 
   return (
-    <div className="flex gap-4 text-center py-3 mb-2">
-      <div className="flex-1">
-        <div className="text-2xl font-bold tabular-nums">{batches.length}</div>
-        <div className="text-xs text-muted-foreground">{batches.length === 1 ? "Batch" : "Batches"}</div>
-      </div>
-      {totalLiters > 0 && (
-        <div className="flex-1">
-          <div className="text-2xl font-bold tabular-nums">{totalLiters}</div>
-          <div className="text-xs text-muted-foreground">Litres</div>
-        </div>
-      )}
-      <div className="flex-1">
-        <div className="text-2xl font-bold tabular-nums">{stages.size}</div>
-        <div className="text-xs text-muted-foreground">{stages.size === 1 ? "Stage" : "Stages"}</div>
-      </div>
-      <div className="flex-1">
-        <div className="text-lg font-bold tabular-nums leading-8">{dayRange}</div>
-        <div className="text-xs text-muted-foreground">Fermenting</div>
-      </div>
-    </div>
+    <p className="text-sm tabular-nums py-2 mb-1">
+      <span className="font-semibold">{batches.length}</span> {batches.length === 1 ? "batch" : "batches"}
+      {totalLiters > 0 && <> · <span className="font-semibold">{totalLiters}</span> L</>}
+      {" · "}{dayRange}
+    </p>
   );
 }
 
@@ -141,18 +108,17 @@ function AlertsSection({ alerts }: { alerts: Alert[] }) {
   if (alerts.length === 0) return null;
 
   return (
-    <section className="mb-4">
-      <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-        Needs Attention
+    <section className="mb-3">
+      <h2 className="text-sm font-semibold mb-1">
+        Needs attention
       </h2>
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {alerts.map((a, i) => (
           <Link
             key={`${a.batchId}-${a.type}-${i}`}
             to={`/batches/${a.batchId}`}
-            className="flex items-center gap-2 py-1.5 -mx-4 px-4 active:bg-accent/50 transition-colors"
+            className="flex items-baseline gap-1.5 py-1.5 -mx-4 px-4 active:bg-accent/50 transition-colors"
           >
-            <span className="text-sm">{ALERT_ICONS[a.type]}</span>
             <span className={cn("text-sm font-medium", ALERT_STYLES[a.type])}>
               {a.batchName}
             </span>
@@ -205,14 +171,12 @@ function BatchRow({ batch }: { batch: BatchSummary & { _stalled?: boolean } }) {
               </span>
             )}
             {batch.velocity !== null && batch.velocity !== 0 && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground tabular-nums">
                 {(batch.velocity * 1000).toFixed(1)} pts/d
               </span>
             )}
             {batch._stalled && (
-              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                Stalled
-              </Badge>
+              <span className="text-xs font-semibold text-destructive">stalled</span>
             )}
           </div>
           {/* Temperature line */}
@@ -236,19 +200,6 @@ function BatchRow({ batch }: { batch: BatchSummary & { _stalled?: boolean } }) {
           Day {batch.days_fermenting}
           {" · "}
           <span>{relativeTime(batch.latest_reading.source_timestamp)}</span>
-          {batch.velocity != null && (
-            <span>
-              {" · "}
-              {batch.velocity < -0.0005
-                ? `dropping ${Math.abs(batch.velocity * 1000).toFixed(1)} pts/day`
-                : batch.velocity > 0.0005
-                  ? "rising"
-                  : "stable"}
-            </span>
-          )}
-          {og && sg && og !== sg && (
-            <span> · {og.toFixed(3)} → {sg.toFixed(3)}</span>
-          )}
         </div>
       )}
     </Link>
@@ -328,8 +279,8 @@ export default function Dashboard() {
 
           {/* Active Batches */}
           <section>
-            <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-              Active Batches
+            <h2 className="text-sm font-semibold mb-1">
+              Active batches
             </h2>
             {sortedBatches.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">
@@ -345,9 +296,9 @@ export default function Dashboard() {
           </section>
 
           {/* Recent Activity */}
-          <section className="mt-8">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-              Recent Activity
+          <section className="mt-5">
+            <h2 className="text-sm font-semibold mb-1">
+              Recent activity
             </h2>
             {data.recent_activities.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">
@@ -364,17 +315,16 @@ export default function Dashboard() {
                       className="block active:bg-accent/50 -mx-4 px-4 py-2 transition-colors"
                     >
                       <div className="flex justify-between items-baseline text-sm">
-                        <span className="flex items-center gap-1.5 truncate">
-                          <span className={cn("inline-block w-2 h-2 rounded-full shrink-0", ACTIVITY_TYPE_COLORS[activity.type] ?? "bg-muted-foreground")} />
+                        <span className="flex items-baseline gap-1.5 truncate">
                           <span className="font-medium">{activity.title}</span>
-                          <span className="text-muted-foreground"> · {activity.batch_name}</span>
+                          <span className="text-muted-foreground">· {activity.batch_name}</span>
                         </span>
                         <span className="text-xs text-muted-foreground ml-2 shrink-0 tabular-nums">
                           {relativeTime(activity.recorded_at)}
                         </span>
                       </div>
                       {preview && (
-                        <div className="text-xs text-muted-foreground mt-0.5 ml-3.5 truncate">
+                        <div className="text-xs text-muted-foreground mt-0.5 truncate">
                           {ACTIVITY_TYPE_LABELS[activity.type]} · {preview}
                         </div>
                       )}

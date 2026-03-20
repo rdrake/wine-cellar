@@ -3,7 +3,6 @@ import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
 import { useChartColors } from "@/hooks/useChartColors";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -11,7 +10,6 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  CartesianGrid,
 } from "recharts";
 import type { Batch, Reading } from "@/types";
 import { abv, attenuation, velocity, tempStats, daysSince, projectedDaysToTarget } from "@/lib/fermentation";
@@ -118,7 +116,7 @@ export default function BatchComparison() {
   const hasData = selectedIds.length > 0 && merged.length > 0;
 
   return (
-    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-6">
+    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
       <h1 className="font-heading text-xl font-bold">Compare Batches</h1>
 
       {loading && (
@@ -165,29 +163,16 @@ export default function BatchComparison() {
               data={merged}
               margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis
                 dataKey="hours"
                 type="number"
                 tick={{ fontSize: 10, fill: colors.mutedForeground }}
                 tickFormatter={(v: number) => `${Math.round(v)}h`}
-                label={{
-                  value: "Hours since first reading",
-                  position: "insideBottom",
-                  offset: -2,
-                  style: { fontSize: 10, fill: colors.mutedForeground },
-                }}
               />
               <YAxis
                 domain={[0.99, 1.125]}
                 tick={{ fontSize: 10, fill: colors.mutedForeground }}
                 tickFormatter={(v: number) => v.toFixed(3)}
-                label={{
-                  value: "SG",
-                  angle: -90,
-                  position: "insideLeft",
-                  style: { fontSize: 10, fill: colors.mutedForeground },
-                }}
               />
               <Tooltip
                 contentStyle={{ backgroundColor: colors.card, borderColor: colors.border, color: colors.cardForeground }}
@@ -217,24 +202,6 @@ export default function BatchComparison() {
         </div>
       )}
 
-      {/* Legend */}
-      {selectedIds.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          {selectedIds.map((id, i) => {
-            const batch = batchById.get(id);
-            return (
-              <span key={id} className="flex items-center gap-1">
-                <span
-                  className="inline-block w-3 h-0.5"
-                  style={{ backgroundColor: COLORS[i] }}
-                />
-                {batch?.name ?? id}
-              </span>
-            );
-          })}
-        </div>
-      )}
-
       {/* Stats comparison table */}
       {selectedIds.length > 0 && (() => {
         const allStats = selectedIds.map((id, i) => {
@@ -245,9 +212,7 @@ export default function BatchComparison() {
         }).filter(Boolean) as (NonNullable<ReturnType<typeof batchStats>> & { color: string })[];
         if (allStats.length === 0) return null;
         return (
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
+          <div className="overflow-x-auto">
                 <table className="w-full text-sm table-fixed">
                   <thead>
                     <tr className="border-b">
@@ -313,9 +278,7 @@ export default function BatchComparison() {
                     </tr>
                   </tbody>
                 </table>
-              </div>
-            </CardContent>
-          </Card>
+          </div>
         );
       })()}
 
