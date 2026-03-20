@@ -34,9 +34,9 @@ export default function Setup() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Wine Cellar</CardTitle>
-          <CardDescription>Connect to your Wine Cellar API</CardDescription>
+        <CardHeader className="text-center">
+          <CardTitle className="font-heading text-2xl tracking-tight">Wine Cellar</CardTitle>
+          <CardDescription>Connect to your API</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

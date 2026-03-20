@@ -7,6 +7,10 @@ import { nowUtc } from "../lib/time";
 
 const activities = new Hono<{ Bindings: Bindings }>();
 
+function isSgMeasurement(type: string, details: Record<string, unknown> | null | undefined): details is Record<string, unknown> {
+  return type === "measurement" && !!details && details.metric === "SG" && typeof details.value === "number";
+}
+
 activities.post("/", async (c) => {
   const db = c.env.DB;
   const batchId = c.req.param("batchId");
@@ -35,6 +39,18 @@ activities.post("/", async (c) => {
     .bind(id, batchId, parsed.data.stage, parsed.data.type, parsed.data.title,
       detailsJson, parsed.data.recorded_at, now, now)
     .run();
+
+  // If this is an SG measurement, also insert a manual reading
+  if (isSgMeasurement(parsed.data.type, parsed.data.details)) {
+    const readingId = crypto.randomUUID();
+    await db
+      .prepare(
+        `INSERT INTO readings (id, batch_id, device_id, gravity, temperature, battery, rssi, source_timestamp, created_at, source)
+         VALUES (?, ?, 'manual', ?, NULL, NULL, NULL, ?, ?, 'manual')`
+      )
+      .bind(readingId, batchId, parsed.data.details!.value, parsed.data.recorded_at, now)
+      .run();
+  }
 
   const row = await db.prepare("SELECT * FROM activities WHERE id = ?").bind(id).first<any>();
   row.details = row.details ? JSON.parse(row.details) : null;
@@ -108,8 +124,18 @@ activities.delete("/:activityId", async (c) => {
   const batchId = c.req.param("batchId");
   const activityId = c.req.param("activityId");
   const row = await db.prepare("SELECT * FROM activities WHERE id = ? AND batch_id = ?")
-    .bind(activityId, batchId).first();
+    .bind(activityId, batchId).first<any>();
   if (!row) return notFound("Activity");
+
+  // If this was an SG measurement, also delete the corresponding manual reading
+  const details = row.details ? JSON.parse(row.details as string) : null;
+  if (isSgMeasurement(row.type as string, details)) {
+    await db
+      .prepare("DELETE FROM readings WHERE batch_id = ? AND source_timestamp = ? AND source = 'manual'")
+      .bind(batchId, row.recorded_at)
+      .run();
+  }
+
   await db.prepare("DELETE FROM activities WHERE id = ?").bind(activityId).run();
   return new Response(null, { status: 204 });
 });

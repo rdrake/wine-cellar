@@ -4,6 +4,7 @@ import { useFetch } from "@/hooks/useFetch";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { GravitySparkline } from "@/components/Sparkline";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,22 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import type { Device, Batch } from "@/types";
+
+function DeviceSparkline({ deviceId }: { deviceId: string }) {
+  const { data } = useFetch(
+    () => api.readings.listByDevice(deviceId, { limit: 50 }),
+    [deviceId],
+  );
+  const readings = data?.items.slice().reverse() ?? [];
+  if (readings.length < 2) return null;
+  const last = readings[readings.length - 1];
+  return (
+    <div className="flex items-center gap-2 mt-2">
+      <GravitySparkline values={readings.map((r) => r.gravity)} width={140} height={24} />
+      <span className="text-xs tabular-nums text-muted-foreground">{last.gravity.toFixed(3)}</span>
+    </div>
+  );
+}
 
 export default function Devices() {
   const { data: devicesData, loading, error, refetch } = useFetch(
@@ -57,6 +74,7 @@ export default function Devices() {
                       Batch: {batchNames.get(device.batch_id) ?? device.batch_id}
                     </p>
                   )}
+                  <DeviceSparkline deviceId={device.id} />
                 </div>
                 <div className="flex items-center gap-2">
                   {device.batch_id ? (

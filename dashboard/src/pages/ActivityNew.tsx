@@ -45,16 +45,32 @@ function DetailFields({ type, details, onChange }: {
         <>
           <div className="space-y-2">
             <Label>Metric</Label>
-            <Input value={details.metric ?? ""} placeholder="pH, TA, SO2" onChange={(e) => set("metric", e.target.value)} required />
+            <Select value={details.metric ?? ""} onValueChange={(v) => v && set("metric", v)}>
+              <SelectTrigger><SelectValue placeholder="Select metric" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SG">Specific Gravity (SG)</SelectItem>
+                <SelectItem value="pH">pH</SelectItem>
+                <SelectItem value="TA">Titratable Acidity (TA)</SelectItem>
+                <SelectItem value="SO2">Free SO2</SelectItem>
+                <SelectItem value="Brix">Brix</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+          {details.metric === "other" && (
+            <div className="space-y-2">
+              <Label>Metric Name</Label>
+              <Input value={details.metric_name ?? ""} onChange={(e) => set("metric_name", e.target.value)} required />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Value</Label>
-              <Input type="number" step="0.01" value={details.value ?? ""} onChange={(e) => set("value", e.target.value)} required />
+              <Input type="number" step="0.001" value={details.value ?? ""} onChange={(e) => set("value", e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label>Unit</Label>
-              <Input value={details.unit ?? ""} onChange={(e) => set("unit", e.target.value)} required />
+              <Input value={details.unit ?? ""} placeholder={details.metric === "SG" || details.metric === "pH" ? "optional" : "g/L, ppm, etc."} onChange={(e) => set("unit", e.target.value)} />
             </div>
           </div>
         </>

@@ -52,10 +52,11 @@ export interface Reading {
   batch_id: string | null;
   device_id: string;
   gravity: number;
-  temperature: number;
-  battery: number;
-  rssi: number;
+  temperature: number | null;
+  battery: number | null;
+  rssi: number | null;
   source_timestamp: string;
+  source: "device" | "manual";
   created_at: string;
 }
 
@@ -75,6 +76,27 @@ export interface ListResponse<T> {
 export interface PaginatedResponse<T> {
   items: T[];
   next_cursor: string | null;
+}
+
+export interface BatchSummary extends Batch {
+  first_reading: {
+    gravity: number;
+    temperature: number | null;
+    source_timestamp: string;
+  } | null;
+  latest_reading: {
+    gravity: number;
+    temperature: number | null;
+    source_timestamp: string;
+  } | null;
+  velocity: number | null;
+  days_fermenting: number;
+  sparkline: { g: number; temp: number | null; t: string }[];
+}
+
+export interface DashboardResponse {
+  active_batches: BatchSummary[];
+  recent_activities: (Activity & { batch_name: string })[];
 }
 
 export interface BatchCreate {

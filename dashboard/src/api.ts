@@ -2,7 +2,7 @@ import type {
   Batch, BatchCreate, BatchUpdate, BatchStatus, BatchStage, WineType,
   Activity, ActivityCreate, ActivityUpdate, ActivityType, AllStage,
   Reading, Device,
-  ListResponse, PaginatedResponse,
+  ListResponse, PaginatedResponse, DashboardResponse,
 } from "./types";
 
 const STORAGE_KEY_URL = "wine-cellar-api-url";
@@ -126,5 +126,6 @@ export const api = {
     unassign: (deviceId: string) =>
       apiFetch<Device>(`/api/v1/devices/${deviceId}/unassign`, { method: "POST" }),
   },
+  dashboard: () => apiFetch<DashboardResponse>("/api/v1/dashboard"),
   health: () => apiFetch<{ status: string }>("/health"),
 };

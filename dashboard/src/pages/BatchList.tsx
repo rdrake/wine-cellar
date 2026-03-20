@@ -21,7 +21,7 @@ export default function BatchList() {
 
   return (
     <div className="p-4 max-w-lg mx-auto">
-      <h1 className="text-xl font-bold mb-4">Batches</h1>
+      <h1 className="font-heading text-xl font-bold mb-4">Batches</h1>
 
       <Tabs value={status} onValueChange={(v) => setStatus(v as BatchStatus)}>
         <TabsList className="w-full">

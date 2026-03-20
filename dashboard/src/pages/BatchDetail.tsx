@@ -5,6 +5,7 @@ import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { GravitySparkline, TemperatureSparkline } from "@/components/Sparkline";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,56 @@ import { STAGE_LABELS, WINE_TYPE_LABELS, SOURCE_MATERIAL_LABELS, STATUS_LABELS }
 import ActivitySection from "@/components/ActivitySection";
 import ReadingsChart from "@/components/ReadingsChart";
 import DeviceSection from "@/components/DeviceSection";
+import type { Reading } from "@/types";
+
+function SparklineSummary({ batchId }: { batchId: string }) {
+  const { data } = useFetch(
+    () => api.readings.listByBatch(batchId, { limit: 200 }),
+    [batchId],
+  );
+
+  const readings = data?.items.slice().reverse() ?? [];
+  if (readings.length < 2) return null;
+
+  const gravities = readings.map((r: Reading) => r.gravity);
+  const temps = readings.map((r: Reading) => r.temperature).filter((t): t is number => t != null);
+  const first = readings[0];
+  const last = readings[readings.length - 1];
+  const og = first.gravity;
+  const sg = last.gravity;
+  const att = og !== sg ? ((og - sg) / (og - 1)) * 100 : 0;
+
+  return (
+    <div className="py-2 space-y-1">
+      <div className="flex items-center gap-3">
+        <GravitySparkline values={gravities} width={180} height={28} />
+        <span className="text-sm tabular-nums">
+          <span className="font-semibold">{sg.toFixed(3)}</span>
+          <span className="text-muted-foreground text-xs"> SG</span>
+        </span>
+        {att > 0 && (
+          <span className="text-sm tabular-nums">
+            <span className="font-semibold">{att.toFixed(0)}</span>
+            <span className="text-muted-foreground text-xs">%</span>
+          </span>
+        )}
+      </div>
+      {temps.length >= 2 && (
+        <div className="flex items-center gap-3">
+          <TemperatureSparkline values={temps} width={180} height={28} />
+          <span className="text-sm tabular-nums">
+            <span className="font-semibold">{temps[temps.length - 1].toFixed(1)}</span>
+            <span className="text-muted-foreground text-xs">{"\u00B0C"}</span>
+          </span>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground tabular-nums">
+        {og.toFixed(3)} → {sg.toFixed(3)}
+        {" · "}{readings.length} readings
+      </p>
+    </div>
+  );
+}
 
 function LifecycleActions({ batch, onAction, onDeleted }: { batch: Batch; onAction: () => void; onDeleted: () => void }) {
   const [confirmAction, setConfirmAction] = useState<{ label: string; action: () => Promise<void> } | null>(null);
@@ -138,7 +189,7 @@ export default function BatchDetail() {
           <div>
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-xl font-bold">{batch.name}</h1>
+                <h1 className="font-heading text-xl font-bold">{batch.name}</h1>
                 <p className="text-sm text-muted-foreground">
                   {WINE_TYPE_LABELS[batch.wine_type]} &middot; {SOURCE_MATERIAL_LABELS[batch.source_material]}
                 </p>
@@ -150,6 +201,8 @@ export default function BatchDetail() {
                 </Link>
               </div>
             </div>
+
+            <SparklineSummary batchId={id!} />
 
             <Card className="mt-3">
               <CardContent className="p-3 text-sm space-y-1">

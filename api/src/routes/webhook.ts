@@ -26,8 +26,9 @@ webhook.post("/rapt", async (c) => {
     return unauthorized("Invalid webhook token");
   }
 
-  // Parse body after auth
-  const rawBody = await c.req.json().catch(() => null);
+  // Parse body after auth — RAPT sends null bytes in payloads, strip before parsing
+  const rawText = await c.req.text();
+  const rawBody = JSON.parse(rawText.replace(/\0/g, "").trim()) as unknown;
   const parsed = RaptWebhookSchema.safeParse(rawBody);
   if (!parsed.success) return validationError(parsed.error.issues);
 
