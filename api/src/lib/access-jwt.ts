@@ -50,16 +50,25 @@ export function __setFetchJwks(fn: typeof fetchJwks) {
   _fetchJwks = fn;
 }
 
+export type JwtResult =
+  | { kind: "user"; email: string }
+  | { kind: "service-token"; clientId: string };
+
 export async function verifyAccessJwt(
   token: string,
   aud: string,
   team: string,
-): Promise<{ email: string } | null> {
+): Promise<JwtResult | null> {
   // Test mode: accept simple tokens for unit tests
   if (team === "test" && token.startsWith("test-jwt-for:")) {
     const email = token.slice("test-jwt-for:".length);
     if (!email) return null;
-    return { email };
+    // Allow test service tokens: "test-jwt-for:st:client-id"
+    if (email.startsWith("st:")) {
+      const clientId = email.slice(3);
+      return clientId ? { kind: "service-token", clientId } : null;
+    }
+    return { kind: "user", email };
   }
 
   try {
@@ -86,11 +95,9 @@ export async function verifyAccessJwt(
     if (!payload.aud || !payload.aud.includes(aud)) return null;
     if (!payload.exp || payload.exp < Date.now() / 1000) return null;
     // Browser JWTs have "email"; service-token JWTs have "common_name" instead
-    const email =
-      payload.email ?? (payload.common_name ? `${payload.common_name}@${team}.cloudflareaccess.com` : null);
-    if (!email) return null;
-
-    return { email };
+    if (payload.email) return { kind: "user", email: payload.email };
+    if (payload.common_name) return { kind: "service-token", clientId: payload.common_name };
+    return null;
   } catch {
     return null;
   }

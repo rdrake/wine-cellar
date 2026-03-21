@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { applyMigrations, fetchJson, authHeaders, WEBHOOK_HEADERS } from "./helpers";
+import { applyMigrations, fetchJson, authHeaders, serviceTokenHeaders, linkServiceToken, WEBHOOK_HEADERS } from "./helpers";
 
 beforeEach(async () => {
   await applyMigrations();
@@ -41,5 +41,30 @@ describe("access auth", () => {
     });
     expect(status).toBe(200);
     expect(json.items).toBeDefined();
+  });
+
+  it("rejects unlinked service token", async () => {
+    const { status, json } = await fetchJson("/api/v1/batches", {
+      headers: serviceTokenHeaders("unknown-client"),
+    });
+    expect(status).toBe(401);
+    expect(json.message).toContain("not linked");
+  });
+
+  it("authenticates linked service token as mapped user", async () => {
+    // Create a user first via normal auth
+    const { json: meJson } = await fetchJson("/api/v1/me", { headers: authHeaders() });
+    const userId = meJson.id;
+
+    // Link service token to that user
+    await linkServiceToken("my-tool", userId);
+
+    // Service token should now see same identity
+    const { status, json } = await fetchJson("/api/v1/me", {
+      headers: serviceTokenHeaders("my-tool"),
+    });
+    expect(status).toBe(200);
+    expect(json.id).toBe(userId);
+    expect(json.email).toBe("test@example.com");
   });
 });

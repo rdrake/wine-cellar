@@ -72,7 +72,17 @@ describe("verifyAccessJwt", () => {
       exp: Math.floor(Date.now() / 1000) + 3600,
     });
     const result = await verifyAccessJwt(token, TEST_AUD, TEST_TEAM);
-    expect(result).toEqual({ email: "test@example.com" });
+    expect(result).toEqual({ kind: "user", email: "test@example.com" });
+  });
+
+  it("returns service-token result for token with common_name", async () => {
+    const token = await createJwt({
+      common_name: "abc123.access",
+      aud: [TEST_AUD],
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const result = await verifyAccessJwt(token, TEST_AUD, TEST_TEAM);
+    expect(result).toEqual({ kind: "service-token", clientId: "abc123.access" });
   });
 
   it("returns null for expired tokens", async () => {
@@ -108,7 +118,7 @@ describe("verifyAccessJwt", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null when email is missing from payload", async () => {
+  it("returns null when neither email nor common_name present", async () => {
     const token = await createJwt({
       aud: [TEST_AUD],
       exp: Math.floor(Date.now() / 1000) + 3600,
@@ -119,11 +129,21 @@ describe("verifyAccessJwt", () => {
 
   it("test mode: accepts test-jwt-for: tokens", async () => {
     const result = await verifyAccessJwt("test-jwt-for:alice@example.com", "any", "test");
-    expect(result).toEqual({ email: "alice@example.com" });
+    expect(result).toEqual({ kind: "user", email: "alice@example.com" });
+  });
+
+  it("test mode: accepts test service tokens", async () => {
+    const result = await verifyAccessJwt("test-jwt-for:st:my-client-id", "any", "test");
+    expect(result).toEqual({ kind: "service-token", clientId: "my-client-id" });
   });
 
   it("test mode: rejects empty email", async () => {
     const result = await verifyAccessJwt("test-jwt-for:", "any", "test");
+    expect(result).toBeNull();
+  });
+
+  it("test mode: rejects empty service token client id", async () => {
+    const result = await verifyAccessJwt("test-jwt-for:st:", "any", "test");
     expect(result).toBeNull();
   });
 });

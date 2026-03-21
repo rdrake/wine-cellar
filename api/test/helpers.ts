@@ -7,6 +7,16 @@ export function authHeaders(email: string = TEST_USER_EMAIL): Record<string, str
   return { "Cf-Access-Jwt-Assertion": `test-jwt-for:${email}` };
 }
 
+export function serviceTokenHeaders(clientId: string): Record<string, string> {
+  return { "Cf-Access-Jwt-Assertion": `test-jwt-for:st:${clientId}` };
+}
+
+export async function linkServiceToken(clientId: string, userId: string) {
+  await env.DB.prepare("INSERT INTO service_tokens (client_id, user_id, label) VALUES (?, ?, ?)")
+    .bind(clientId, userId, "test-token")
+    .run();
+}
+
 export const API_HEADERS = authHeaders(); // backward compat alias
 export const WEBHOOK_HEADERS = { "X-Webhook-Token": "test-webhook-token" };
 

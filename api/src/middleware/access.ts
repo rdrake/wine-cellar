@@ -1,6 +1,5 @@
 import { createMiddleware } from "hono/factory";
 import { verifyAccessJwt } from "../lib/access-jwt";
-import { timingSafeEqual } from "../lib/crypto";
 import { unauthorized } from "../lib/errors";
 
 type User = { id: string; email: string; name: string | null };
@@ -10,7 +9,6 @@ type AccessBindings = {
   CF_ACCESS_AUD: string;
   CF_ACCESS_TEAM: string;
   WEBHOOK_TOKEN: string;
-  API_KEY?: string; // Legacy — kept during rollout, removed after
 };
 
 export const accessAuth = createMiddleware<{
@@ -24,14 +22,17 @@ export const accessAuth = createMiddleware<{
     return next();
   }
 
-  // --- Path 1: Cloudflare Access JWT (preferred) ---
+  // Cloudflare Access JWT (browser or service token)
   const jwt = c.req.header("Cf-Access-Jwt-Assertion");
-  if (jwt) {
-    const payload = await verifyAccessJwt(jwt, c.env.CF_ACCESS_AUD, c.env.CF_ACCESS_TEAM);
-    if (!payload) return unauthorized("Invalid access token");
+  if (!jwt) return unauthorized("Missing access token");
 
-    // Upsert user
-    const db = c.env.DB;
+  const result = await verifyAccessJwt(jwt, c.env.CF_ACCESS_AUD, c.env.CF_ACCESS_TEAM);
+  if (!result) return unauthorized("Invalid access token");
+
+  const db = c.env.DB;
+
+  if (result.kind === "user") {
+    // Browser JWT — upsert user by email
     const user = await db
       .prepare(
         `INSERT INTO users (id, email, created_at)
@@ -39,7 +40,7 @@ export const accessAuth = createMiddleware<{
          ON CONFLICT(email) DO UPDATE SET email = email
          RETURNING *`,
       )
-      .bind(crypto.randomUUID(), payload.email)
+      .bind(crypto.randomUUID(), result.email)
       .first<User>();
 
     if (!user) return unauthorized("User creation failed");
@@ -47,12 +48,20 @@ export const accessAuth = createMiddleware<{
     return next();
   }
 
-  // --- Path 2: Legacy API key (transitional, removed after rollout) ---
-  const apiKey = c.req.header("X-API-Key");
-  const expectedKey = c.env.API_KEY;
-  if (apiKey && expectedKey && timingSafeEqual(apiKey, expectedKey)) {
-    return next();
-  }
+  // Service token JWT — look up mapped user
+  const mapping = await db
+    .prepare("SELECT user_id FROM service_tokens WHERE client_id = ?")
+    .bind(result.clientId)
+    .first<{ user_id: string }>();
 
-  return unauthorized("Missing access token");
+  if (!mapping) return unauthorized("Service token not linked to a user");
+
+  const user = await db
+    .prepare("SELECT * FROM users WHERE id = ?")
+    .bind(mapping.user_id)
+    .first<User>();
+
+  if (!user) return unauthorized("Mapped user not found");
+  c.set("user", user);
+  return next();
 });
