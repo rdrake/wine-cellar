@@ -318,14 +318,33 @@ function NotificationsSection() {
               Get alerts for fermentation stalls, temperature issues, and stage suggestions.
             </p>
           </div>
-          <Button
-            size="sm"
-            variant={enabled ? "outline" : "default"}
-            disabled={loading}
+          <div className="flex gap-2 shrink-0">
+            {enabled && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={loading}
+                onClick={async () => {
+                  try {
+                    await api.push.test();
+                    toast.success("Test notification sent");
+                  } catch {
+                    toast.error("Couldn't send test notification");
+                  }
+                }}
+              >
+                Test
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant={enabled ? "outline" : "default"}
+              disabled={loading}
             onClick={toggle}
           >
             {loading ? "..." : enabled ? "Disable" : "Enable"}
-          </Button>
+            </Button>
+          </div>
         </div>
       )}
     </div>

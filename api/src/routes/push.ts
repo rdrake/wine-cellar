@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AppEnv } from "../app";
 import { validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
+import { sendPushToUser } from "../lib/web-push";
 
 const SubscribeSchema = z.object({
   endpoint: z.string().url(),
@@ -68,6 +69,18 @@ push.delete("/subscribe", async (c) => {
     .run();
 
   return c.body(null, 204);
+});
+
+push.post("/test", async (c) => {
+  const user = c.get("user");
+  await sendPushToUser(c.env.DB, user.id, {
+    title: "Wine Cellar",
+    body: "Push notifications are working!",
+    url: "/settings",
+    type: "test",
+    alertId: "test",
+  }, c.env.VAPID_PUBLIC_KEY, c.env.VAPID_PRIVATE_KEY);
+  return c.json({ status: "sent" });
 });
 
 export default push;

@@ -111,6 +111,8 @@ export const api = {
       apiFetch<{ status: string }>("/api/v1/push/subscribe", { method: "POST", body: subscription }),
     unsubscribe: (endpoint: string) =>
       apiFetch<{ status: string }>("/api/v1/push/subscribe", { method: "DELETE", body: { endpoint } }),
+    test: () =>
+      apiFetch<{ status: string }>("/api/v1/push/test", { method: "POST" }),
   },
   dashboard: () => apiFetch<DashboardResponse>("/api/v1/dashboard"),
   health: () => apiFetch<{ status: string }>("/health"),
