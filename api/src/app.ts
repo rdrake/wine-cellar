@@ -6,6 +6,7 @@ import devices from "./routes/devices";
 import webhook from "./routes/webhook";
 import dashboard from "./routes/dashboard";
 import push from "./routes/push";
+import alerts from "./routes/alerts";
 import { batchReadings, deviceReadings } from "./routes/readings";
 
 export type Bindings = {
@@ -41,6 +42,7 @@ app.route("/api/v1/batches/:batchId/readings", batchReadings);
 app.route("/api/v1/devices/:deviceId/readings", deviceReadings);
 app.route("/api/v1/dashboard", dashboard);
 app.route("/api/v1/push", push);
+app.route("/api/v1/alerts", alerts);
 app.route("/webhook", webhook);
 
 export default app;

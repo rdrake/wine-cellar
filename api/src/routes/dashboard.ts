@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app";
+import { getActiveAlerts } from "../lib/alert-manager";
 
 const dashboard = new Hono<AppEnv>();
 
@@ -74,9 +75,12 @@ dashboard.get("/", async (c) => {
     details: row.details ? JSON.parse(row.details) : null,
   }));
 
+  const activeAlerts = await getActiveAlerts(db, user.id);
+
   return c.json({
     active_batches: batchSummaries,
     recent_activities: recentActivities,
+    alerts: activeAlerts,
   });
 });
 
