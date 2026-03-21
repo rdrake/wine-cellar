@@ -85,9 +85,12 @@ export async function verifyAccessJwt(
     const payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(parts[1])));
     if (!payload.aud || !payload.aud.includes(aud)) return null;
     if (!payload.exp || payload.exp < Date.now() / 1000) return null;
-    if (!payload.email) return null;
+    // Browser JWTs have "email"; service-token JWTs have "common_name" instead
+    const email =
+      payload.email ?? (payload.common_name ? `${payload.common_name}@${team}.cloudflareaccess.com` : null);
+    if (!email) return null;
 
-    return { email: payload.email };
+    return { email };
   } catch {
     return null;
   }
