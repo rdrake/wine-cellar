@@ -1,11 +1,16 @@
 import { Hono } from "hono";
-import type { Bindings } from "../app";
+import type { AppEnv } from "../app";
 import { BatchCreateSchema, BatchUpdateSchema } from "../models";
 import { notFound, conflict, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
 import { WAYPOINT_ORDER } from "../schema";
 
-const batches = new Hono<{ Bindings: Bindings }>();
+const batches = new Hono<AppEnv>();
+
+async function getOwnedBatch(db: D1Database, batchId: string, userId: string) {
+  return db.prepare("SELECT * FROM batches WHERE id = ? AND user_id = ?")
+    .bind(batchId, userId).first<any>();
+}
 
 batches.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -13,17 +18,18 @@ batches.post("/", async (c) => {
   if (!parsed.success) return validationError(parsed.error.issues);
 
   const db = c.env.DB;
+  const user = c.get("user");
   const id = crypto.randomUUID();
   const now = nowUtc();
   const b = parsed.data;
 
   await db
     .prepare(
-      `INSERT INTO batches (id, name, wine_type, source_material, stage, status,
+      `INSERT INTO batches (id, user_id, name, wine_type, source_material, stage, status,
        volume_liters, target_volume_liters, started_at, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'must_prep', 'active', ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, 'must_prep', 'active', ?, ?, ?, ?, ?, ?)`
     )
-    .bind(id, b.name, b.wine_type, b.source_material,
+    .bind(id, user.id, b.name, b.wine_type, b.source_material,
       b.volume_liters ?? null, b.target_volume_liters ?? null,
       b.started_at, b.notes ?? null, now, now)
     .run();
@@ -34,13 +40,14 @@ batches.post("/", async (c) => {
 
 batches.get("/", async (c) => {
   const db = c.env.DB;
+  const user = c.get("user");
   const status = c.req.query("status");
   const stage = c.req.query("stage");
   const wineType = c.req.query("wine_type");
   const sourceMaterial = c.req.query("source_material");
 
-  let sql = "SELECT * FROM batches WHERE 1=1";
-  const params: unknown[] = [];
+  let sql = "SELECT * FROM batches WHERE user_id = ?";
+  const params: unknown[] = [user.id];
 
   if (status) {
     sql += " AND status = ?";
@@ -59,8 +66,7 @@ batches.get("/", async (c) => {
 });
 
 batches.get("/:batchId", async (c) => {
-  const row = await c.env.DB.prepare("SELECT * FROM batches WHERE id = ?")
-    .bind(c.req.param("batchId")).first();
+  const row = await getOwnedBatch(c.env.DB, c.req.param("batchId"), c.get("user").id);
   if (!row) return notFound("Batch");
   return c.json(row);
 });
@@ -68,7 +74,7 @@ batches.get("/:batchId", async (c) => {
 batches.patch("/:batchId", async (c) => {
   const db = c.env.DB;
   const batchId = c.req.param("batchId");
-  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first();
+  const row = await getOwnedBatch(db, batchId, c.get("user").id);
   if (!row) return notFound("Batch");
 
   const body = await c.req.json().catch(() => null);
@@ -118,17 +124,16 @@ batches.patch("/:batchId", async (c) => {
 
   updates.updated_at = nowUtc();
   const setCols = Object.keys(updates).map((k) => `${k} = ?`).join(", ");
-  const values = [...Object.values(updates), batchId];
-  await db.prepare(`UPDATE batches SET ${setCols} WHERE id = ?`).bind(...values).run();
+  await db.prepare(`UPDATE batches SET ${setCols} WHERE id = ? AND user_id = ?`).bind(...Object.values(updates), batchId, c.get("user").id).run();
 
-  const updated = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first();
+  const updated = await getOwnedBatch(db, batchId, c.get("user").id);
   return c.json(updated);
 });
 
 batches.delete("/:batchId", async (c) => {
   const db = c.env.DB;
   const batchId = c.req.param("batchId");
-  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  const row = await getOwnedBatch(db, batchId, c.get("user").id);
   if (!row) return notFound("Batch");
 
   if (row.status !== "abandoned") {
@@ -144,7 +149,7 @@ batches.delete("/:batchId", async (c) => {
     }
   }
 
-  await db.prepare("DELETE FROM batches WHERE id = ?").bind(batchId).run();
+  await db.prepare("DELETE FROM batches WHERE id = ? AND user_id = ?").bind(batchId, c.get("user").id).run();
   return new Response(null, { status: 204 });
 });
 
@@ -153,7 +158,7 @@ batches.delete("/:batchId", async (c) => {
 batches.post("/:batchId/advance", async (c) => {
   const db = c.env.DB;
   const batchId = c.req.param("batchId");
-  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  const row = await getOwnedBatch(db, batchId, c.get("user").id);
   if (!row) return notFound("Batch");
   if (row.status !== "active") return conflict("Only active batches can advance");
 
@@ -162,9 +167,9 @@ batches.post("/:batchId/advance", async (c) => {
 
   const nextStage = WAYPOINT_ORDER[currentIdx + 1];
   const now = nowUtc();
-  await db.prepare("UPDATE batches SET stage = ?, updated_at = ? WHERE id = ?")
-    .bind(nextStage, now, batchId).run();
-  return c.json(await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first());
+  await db.prepare("UPDATE batches SET stage = ?, updated_at = ? WHERE id = ? AND user_id = ?")
+    .bind(nextStage, now, batchId, c.get("user").id).run();
+  return c.json(await getOwnedBatch(db, batchId, c.get("user").id));
 });
 
 async function unassignDevices(db: D1Database, batchId: string, now: string) {
@@ -176,55 +181,55 @@ async function unassignDevices(db: D1Database, batchId: string, now: string) {
 batches.post("/:batchId/complete", async (c) => {
   const db = c.env.DB;
   const batchId = c.req.param("batchId");
-  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  const row = await getOwnedBatch(db, batchId, c.get("user").id);
   if (!row) return notFound("Batch");
   if (row.status !== "active") return conflict("Only active batches can be completed");
 
   const now = nowUtc();
-  await db.prepare("UPDATE batches SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ?")
-    .bind(now, now, batchId).run();
+  await db.prepare("UPDATE batches SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ? AND user_id = ?")
+    .bind(now, now, batchId, c.get("user").id).run();
   await unassignDevices(db, batchId, now);
-  return c.json(await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first());
+  return c.json(await getOwnedBatch(db, batchId, c.get("user").id));
 });
 
 batches.post("/:batchId/abandon", async (c) => {
   const db = c.env.DB;
   const batchId = c.req.param("batchId");
-  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  const row = await getOwnedBatch(db, batchId, c.get("user").id);
   if (!row) return notFound("Batch");
   if (row.status !== "active") return conflict("Only active batches can be abandoned");
 
   const now = nowUtc();
-  await db.prepare("UPDATE batches SET status = 'abandoned', updated_at = ? WHERE id = ?")
-    .bind(now, batchId).run();
+  await db.prepare("UPDATE batches SET status = 'abandoned', updated_at = ? WHERE id = ? AND user_id = ?")
+    .bind(now, batchId, c.get("user").id).run();
   await unassignDevices(db, batchId, now);
-  return c.json(await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first());
+  return c.json(await getOwnedBatch(db, batchId, c.get("user").id));
 });
 
 batches.post("/:batchId/archive", async (c) => {
   const db = c.env.DB;
   const batchId = c.req.param("batchId");
-  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  const row = await getOwnedBatch(db, batchId, c.get("user").id);
   if (!row) return notFound("Batch");
   if (row.status !== "completed") return conflict("Only completed batches can be archived");
 
   const now = nowUtc();
-  await db.prepare("UPDATE batches SET status = 'archived', updated_at = ? WHERE id = ?")
-    .bind(now, batchId).run();
-  return c.json(await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first());
+  await db.prepare("UPDATE batches SET status = 'archived', updated_at = ? WHERE id = ? AND user_id = ?")
+    .bind(now, batchId, c.get("user").id).run();
+  return c.json(await getOwnedBatch(db, batchId, c.get("user").id));
 });
 
 batches.post("/:batchId/unarchive", async (c) => {
   const db = c.env.DB;
   const batchId = c.req.param("batchId");
-  const row = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  const row = await getOwnedBatch(db, batchId, c.get("user").id);
   if (!row) return notFound("Batch");
   if (row.status !== "archived") return conflict("Only archived batches can be unarchived");
 
   const now = nowUtc();
-  await db.prepare("UPDATE batches SET status = 'completed', updated_at = ? WHERE id = ?")
-    .bind(now, batchId).run();
-  return c.json(await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first());
+  await db.prepare("UPDATE batches SET status = 'completed', updated_at = ? WHERE id = ? AND user_id = ?")
+    .bind(now, batchId, c.get("user").id).run();
+  return c.json(await getOwnedBatch(db, batchId, c.get("user").id));
 });
 
 export default batches;

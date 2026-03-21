@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { applyMigrations, fetchJson, createBatch, API_HEADERS, VALID_BATCH } from "./helpers";
+import { applyMigrations, fetchJson, createBatch, authHeaders, API_HEADERS, VALID_BATCH } from "./helpers";
 
 beforeEach(async () => {
   await applyMigrations();
@@ -87,6 +87,18 @@ describe("batches CRUD", () => {
       method: "DELETE",
       headers: API_HEADERS,
     });
+    expect(status).toBe(404);
+  });
+
+  it("user A cannot see user B's batches", async () => {
+    const idA = await createBatch({ name: "User A Batch" }, "a@example.com");
+    const idB = await createBatch({ name: "User B Batch" }, "b@example.com");
+
+    const { json: listA } = await fetchJson("/api/v1/batches", { headers: authHeaders("a@example.com") });
+    expect(listA.items).toHaveLength(1);
+    expect(listA.items[0].name).toBe("User A Batch");
+
+    const { status } = await fetchJson(`/api/v1/batches/${idB}`, { headers: authHeaders("a@example.com") });
     expect(status).toBe(404);
   });
 });
