@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Bindings } from "../app";
+import type { AppEnv } from "../app";
 import { notFound } from "../lib/errors";
 import { encodeCursor, decodeCursor } from "../lib/cursor";
 
@@ -14,8 +14,10 @@ async function paginatedQuery(
   cursor: string | null,
   startTime: string | null,
   endTime: string | null,
+  userId: string | null,
 ) {
   let sql = baseSql;
+  if (userId) { sql += " AND user_id = ?"; params.push(userId); }
   if (startTime) { sql += " AND source_timestamp >= ?"; params.push(startTime); }
   if (endTime) { sql += " AND source_timestamp <= ?"; params.push(endTime); }
   if (cursor) {
@@ -41,12 +43,13 @@ async function paginatedQuery(
   return { items, next_cursor: nextCursor };
 }
 
-export const batchReadings = new Hono<{ Bindings: Bindings }>();
+export const batchReadings = new Hono<AppEnv>();
 
 batchReadings.get("/", async (c) => {
   const db = c.env.DB;
+  const user = c.get("user");
   const batchId = c.req.param("batchId");
-  const batch = await db.prepare("SELECT id FROM batches WHERE id = ?").bind(batchId).first();
+  const batch = await db.prepare("SELECT id FROM batches WHERE id = ? AND user_id = ?").bind(batchId, user.id).first();
   if (!batch) return notFound("Batch");
 
   const limit = Math.max(1, Math.min(Number(c.req.query("limit") ?? DEFAULT_LIMIT), MAX_LIMIT));
@@ -54,16 +57,17 @@ batchReadings.get("/", async (c) => {
   const startTime = c.req.query("start_time") ?? null;
   const endTime = c.req.query("end_time") ?? null;
 
-  const result = await paginatedQuery(db, "SELECT * FROM readings WHERE batch_id = ?", [batchId], limit, cursor, startTime, endTime);
+  const result = await paginatedQuery(db, "SELECT * FROM readings WHERE batch_id = ?", [batchId], limit, cursor, startTime, endTime, user.id);
   return c.json(result);
 });
 
-export const deviceReadings = new Hono<{ Bindings: Bindings }>();
+export const deviceReadings = new Hono<AppEnv>();
 
 deviceReadings.get("/", async (c) => {
   const db = c.env.DB;
+  const user = c.get("user");
   const deviceId = c.req.param("deviceId");
-  const device = await db.prepare("SELECT id FROM devices WHERE id = ?").bind(deviceId).first();
+  const device = await db.prepare("SELECT id FROM devices WHERE id = ? AND user_id = ?").bind(deviceId, user.id).first();
   if (!device) return notFound("Device");
 
   const limit = Math.max(1, Math.min(Number(c.req.query("limit") ?? DEFAULT_LIMIT), MAX_LIMIT));
@@ -71,6 +75,6 @@ deviceReadings.get("/", async (c) => {
   const startTime = c.req.query("start_time") ?? null;
   const endTime = c.req.query("end_time") ?? null;
 
-  const result = await paginatedQuery(db, "SELECT * FROM readings WHERE device_id = ?", [deviceId], limit, cursor, startTime, endTime);
+  const result = await paginatedQuery(db, "SELECT * FROM readings WHERE device_id = ?", [deviceId], limit, cursor, startTime, endTime, user.id);
   return c.json(result);
 });
