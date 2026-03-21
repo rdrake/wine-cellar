@@ -5,6 +5,7 @@ import activities from "./routes/activities";
 import devices from "./routes/devices";
 import webhook from "./routes/webhook";
 import dashboard from "./routes/dashboard";
+import push from "./routes/push";
 import { batchReadings, deviceReadings } from "./routes/readings";
 
 export type Bindings = {
@@ -12,6 +13,8 @@ export type Bindings = {
   CF_ACCESS_AUD: string;
   CF_ACCESS_TEAM: string;
   WEBHOOK_TOKEN: string;
+  VAPID_PUBLIC_KEY: string;
+  VAPID_PRIVATE_KEY: string;
   API_KEY?: string; // Legacy — kept during rollout, removed after
 };
 
@@ -37,6 +40,7 @@ app.route("/api/v1/devices", devices);
 app.route("/api/v1/batches/:batchId/readings", batchReadings);
 app.route("/api/v1/devices/:deviceId/readings", deviceReadings);
 app.route("/api/v1/dashboard", dashboard);
+app.route("/api/v1/push", push);
 app.route("/webhook", webhook);
 
 export default app;

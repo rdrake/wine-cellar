@@ -18,6 +18,8 @@ export default defineWorkersConfig({
             CF_ACCESS_AUD: "test-aud",
             CF_ACCESS_TEAM: "test",
             WEBHOOK_TOKEN: "test-webhook-token",
+            VAPID_PUBLIC_KEY: "test-vapid-public-key",
+            VAPID_PRIVATE_KEY: "test-vapid-private-key",
             MIGRATION_SQL: migrationSql,
           },
         },
