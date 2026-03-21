@@ -1,22 +1,24 @@
 import { Hono } from "hono";
-import type { Bindings } from "../app";
+import type { AppEnv } from "../app";
 
-const dashboard = new Hono<{ Bindings: Bindings }>();
+const dashboard = new Hono<AppEnv>();
 
 dashboard.get("/", async (c) => {
   const db = c.env.DB;
+  const user = c.get("user");
 
   // Active batches
   const batches = await db
-    .prepare("SELECT * FROM batches WHERE status = 'active' ORDER BY created_at DESC")
+    .prepare("SELECT * FROM batches WHERE status = 'active' AND user_id = ? ORDER BY created_at DESC")
+    .bind(user.id)
     .all<any>();
 
   const batchSummaries = await Promise.all(
     batches.results.map(async (batch: any) => {
       // All readings for sparkline (chronological, capped at 200)
       const readings = await db
-        .prepare("SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? ORDER BY source_timestamp ASC LIMIT 200")
-        .bind(batch.id)
+        .prepare("SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? AND user_id = ? ORDER BY source_timestamp ASC LIMIT 200")
+        .bind(batch.id, user.id)
         .all<any>();
 
       const points = readings.results;
@@ -28,8 +30,8 @@ dashboard.get("/", async (c) => {
       if (latest) {
         const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
         const oldest48h = await db
-          .prepare("SELECT gravity, source_timestamp FROM readings WHERE batch_id = ? AND source_timestamp >= ? ORDER BY source_timestamp ASC LIMIT 1")
-          .bind(batch.id, cutoff)
+          .prepare("SELECT gravity, source_timestamp FROM readings WHERE batch_id = ? AND user_id = ? AND source_timestamp >= ? ORDER BY source_timestamp ASC LIMIT 1")
+          .bind(batch.id, user.id, cutoff)
           .first<any>();
 
         if (oldest48h && oldest48h.source_timestamp !== latest.source_timestamp) {
@@ -61,8 +63,10 @@ dashboard.get("/", async (c) => {
     .prepare(
       `SELECT a.*, b.name as batch_name FROM activities a
        JOIN batches b ON b.id = a.batch_id
+       WHERE b.user_id = ?
        ORDER BY a.recorded_at DESC LIMIT 8`
     )
+    .bind(user.id)
     .all<any>();
 
   const recentActivities = activities.results.map((row: any) => ({
