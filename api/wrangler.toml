@@ -7,7 +7,7 @@ compatibility_date = "2025-11-02"
 mode = "smart"
 
 [vars]
-CF_ACCESS_TEAM = "wine-cellar"
+CF_ACCESS_TEAM = "rdrake"
 
 [[d1_databases]]
 binding = "DB"
