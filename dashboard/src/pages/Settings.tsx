@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { api, getApiConfig, clearApiConfig } from "@/api";
+import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
 import { GravitySparkline } from "@/components/Sparkline";
@@ -186,48 +185,44 @@ function AssignDialog({ device, onClose, onAssigned }: {
   );
 }
 
-// ── Connection Section ───────────────────────────────────────────────
+// ── Claim Section ────────────────────────────────────────────────────
 
-function ConnectionSection() {
-  const navigate = useNavigate();
-  const config = getApiConfig();
-  const [checking, setChecking] = useState(false);
-  const [status, setStatus] = useState<"ok" | "error" | null>(null);
+function ClaimSection({ onClaimed }: { onClaimed: () => void }) {
+  const [deviceId, setDeviceId] = useState("");
+  const [claiming, setClaiming] = useState(false);
 
-  async function checkConnection() {
-    setChecking(true);
-    setStatus(null);
+  async function handleClaim() {
+    if (!deviceId.trim()) return;
+    setClaiming(true);
     try {
-      await api.health();
-      setStatus("ok");
-    } catch {
-      setStatus("error");
+      await api.devices.claim(deviceId.trim());
+      toast.success("Device claimed");
+      setDeviceId("");
+      onClaimed();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Couldn't claim device");
     } finally {
-      setChecking(false);
+      setClaiming(false);
     }
-  }
-
-  function disconnect() {
-    clearApiConfig();
-    navigate("/setup");
   }
 
   return (
     <div className="space-y-2">
-        <div className="flex justify-between items-baseline">
-          <span className="text-xs text-muted-foreground">API</span>
-          <span className="text-xs font-mono truncate max-w-[200px]">{config.url ?? "Not configured"}</span>
-        </div>
-        {status === "ok" && <p className="text-xs text-green-600 dark:text-green-400">Connected</p>}
-        {status === "error" && <p className="text-xs text-destructive">Connection failed</p>}
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={checkConnection} disabled={checking}>
-            {checking ? "Checking..." : "Test Connection"}
-          </Button>
-          <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={disconnect}>
-            Disconnect
-          </Button>
-        </div>
+      <p className="text-xs text-muted-foreground">
+        Enter a device ID to claim an unregistered RAPT Pill.
+        The device must have sent at least one reading.
+      </p>
+      <div className="flex gap-2">
+        <input
+          className="flex-1 px-2 py-1 text-sm border rounded bg-background"
+          placeholder="e.g. pill-abc-123"
+          value={deviceId}
+          onChange={(e) => setDeviceId(e.target.value)}
+        />
+        <Button size="sm" disabled={!deviceId.trim() || claiming} onClick={handleClaim}>
+          {claiming ? "Claiming..." : "Claim"}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -291,12 +286,10 @@ export default function Settings() {
         </div>
       </section>
 
-      {/* Connection */}
+      {/* Claim Device */}
       <section>
-        <h2 className="text-sm font-semibold mb-2">
-          Connection
-        </h2>
-        <ConnectionSection />
+        <h2 className="text-sm font-semibold mb-2">Claim Device</h2>
+        <ClaimSection onClaimed={refetch} />
       </section>
 
       {assignDialog && (
