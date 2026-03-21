@@ -367,10 +367,18 @@ describe("access auth", () => {
 
 **Step 2: Write the access auth middleware**
 
+The middleware supports **dual-auth** for zero-downtime rollout: it accepts BOTH
+the old `X-API-Key` header (if `API_KEY` binding exists) AND the new
+`Cf-Access-Jwt-Assertion` JWT. This lets us deploy the new API before migrating
+the database or deploying the new dashboard. Once the migration is complete and
+the new dashboard is live, we remove the `API_KEY` secret and the legacy path
+becomes a no-op.
+
 ```typescript
 // api/src/middleware/access.ts
 import { createMiddleware } from "hono/factory";
 import { verifyAccessJwt } from "../lib/access-jwt";
+import { timingSafeEqual } from "../lib/crypto";
 import { unauthorized } from "../lib/errors";
 
 type User = { id: string; email: string; name: string | null };
@@ -380,6 +388,7 @@ type AccessBindings = {
   CF_ACCESS_AUD: string;
   CF_ACCESS_TEAM: string;
   WEBHOOK_TOKEN: string;
+  API_KEY?: string;  // Legacy — kept during rollout, removed after
 };
 
 export const accessAuth = createMiddleware<{
@@ -393,28 +402,41 @@ export const accessAuth = createMiddleware<{
     return next();
   }
 
+  // --- Path 1: Cloudflare Access JWT (preferred) ---
   const jwt = c.req.header("Cf-Access-Jwt-Assertion");
-  if (!jwt) return unauthorized("Missing access token");
+  if (jwt) {
+    const payload = await verifyAccessJwt(jwt, c.env.CF_ACCESS_AUD, c.env.CF_ACCESS_TEAM);
+    if (!payload) return unauthorized("Invalid access token");
 
-  const payload = await verifyAccessJwt(jwt, c.env.CF_ACCESS_AUD, c.env.CF_ACCESS_TEAM);
-  if (!payload) return unauthorized("Invalid access token");
+    // Upsert user
+    const db = c.env.DB;
+    const user = await db
+      .prepare(
+        `INSERT INTO users (id, email, created_at)
+         VALUES (?, ?, datetime('now'))
+         ON CONFLICT(email) DO UPDATE SET email = email
+         RETURNING *`,
+      )
+      .bind(crypto.randomUUID(), payload.email)
+      .first<User>();
 
-  // Upsert user
-  const db = c.env.DB;
-  const user = await db
-    .prepare(
-      `INSERT INTO users (id, email, created_at)
-       VALUES (?, ?, datetime('now'))
-       ON CONFLICT(email) DO UPDATE SET email = email
-       RETURNING *`,
-    )
-    .bind(crypto.randomUUID(), payload.email)
-    .first<User>();
+    if (!user) return unauthorized("User creation failed");
+    c.set("user", user);
+    return next();
+  }
 
-  if (!user) return unauthorized("User creation failed");
+  // --- Path 2: Legacy API key (transitional, removed after rollout) ---
+  const apiKey = c.req.header("X-API-Key");
+  const expectedKey = c.env.API_KEY;
+  if (apiKey && expectedKey && timingSafeEqual(apiKey, expectedKey)) {
+    // Legacy path: no user context available (pre-migration, single-tenant).
+    // Route handlers must tolerate c.get("user") being undefined during
+    // the brief window where old dashboard talks to new API before migration.
+    // After migration + new dashboard deploy, this path is never hit.
+    return next();
+  }
 
-  c.set("user", user);
-  await next();
+  return unauthorized("Missing access token");
 });
 ```
 
@@ -436,6 +458,7 @@ export type Bindings = {
   CF_ACCESS_AUD: string;
   CF_ACCESS_TEAM: string;
   WEBHOOK_TOKEN: string;
+  API_KEY?: string;  // Legacy — kept during rollout, removed after
 };
 
 export type User = { id: string; email: string; name: string | null };
@@ -1515,57 +1538,70 @@ CF_ACCESS_TEAM = "wine-cellar"
 
 (CF_ACCESS_AUD is a secret — set via `wrangler secret put CF_ACCESS_AUD`)
 
-**CRITICAL: Rollout order matters.** The migration adds `user_id NOT NULL` to
-batches and activities. If old API code runs after the migration, INSERTs without
-`user_id` will fail. The service worker can keep stale dashboard JS alive longer
-than expected. Safe sequence:
+**Zero-downtime rollout via dual-auth.** The middleware accepts BOTH `X-API-Key`
+(old dashboard) and `Cf-Access-Jwt-Assertion` (new dashboard). This eliminates
+any incompatibility window. Sequence:
+
+1. Deploy new API first — dual-auth means old dashboard (API key) keeps working
+2. Apply migration — new API handles user_id, old dashboard still works via legacy path
+3. Deploy new dashboard — switches to JWT auth, Pages Functions proxy
+4. Clean up — delete API_KEY secret, remove legacy auth path
 
 **Step 2: Set new secrets (BEFORE deploying new code)**
 
 ```bash
 cd api && npx wrangler secret put CF_ACCESS_AUD
 # Paste the audience tag from Cloudflare Access dashboard
-# Keep API_KEY alive for now — old code still needs it during transition
+# Keep API_KEY alive — old dashboard still needs it until step 5
 ```
 
-**Step 3: Deploy new API Worker first (backward-compatible)**
+**Step 3: Deploy new API Worker (dual-auth, backward-compatible)**
 
-The new API code already handles both auth paths during this window because
-the migration hasn't run yet — old `batches` table has no `user_id` column.
-Actually, this won't work cleanly. Instead:
-
-**Maintenance window approach** (small personal app, simplest):
-1. Bump service worker cache version to `wine-cellar-v3` to force stale client eviction
-2. Deploy dashboard with SW update → old clients refresh within minutes
-3. Apply migration on production D1
-4. Deploy new API Worker immediately after
-5. Delete old API_KEY secret
+The new API accepts both auth methods. Old dashboard keeps working via `X-API-Key`.
 
 ```bash
-# Step 3a: Bump SW cache version (already done in dashboard code)
-cd dashboard && npm run build && npx wrangler pages deploy dist --project-name wine-cellar-dashboard
-
-# Step 3b: Wait ~1 minute for SW to activate on any open clients, then:
-cd api && npx wrangler d1 migrations apply wine-cellar-api --remote
-
-# Step 3c: Deploy new API immediately after migration
 cd api && npx wrangler deploy
-
-# Step 3d: Clean up old secret
-cd api && npx wrangler secret delete API_KEY
 ```
 
-**Step 4: Verify post-deploy**
+**Step 4: Apply migration on production D1**
+
+Now safe because the new API code handles `user_id` in all queries.
+
+```bash
+cd api && npx wrangler d1 migrations apply wine-cellar-api --remote
+```
+
+**Step 5: Deploy new dashboard (switches to JWT auth)**
+
+Bump SW cache to `wine-cellar-v3`, deploy with Pages Functions proxy.
+
+```bash
+cd dashboard && npm run build && npx wrangler pages deploy dist --project-name wine-cellar-dashboard
+```
+
+**Step 6: Verify everything works end-to-end**
 
 ```bash
 # Health check
-curl -s https://wine-cellar-api.rdrake.workers.dev/health
+curl -s https://wine-cellar-dashboard.pages.dev/health
 
 # Verify migration applied
 cd api && npx wrangler d1 execute wine-cellar-api --remote --command "SELECT count(*) FROM users"
 ```
 
-**Step 5: Commit config changes**
+**Step 7: Clean up legacy auth**
+
+Once confirmed working, remove the API_KEY secret. The dual-auth legacy path
+in the middleware becomes a no-op (no `API_KEY` binding = never matches).
+
+```bash
+cd api && npx wrangler secret delete API_KEY
+```
+
+Optionally, in a follow-up commit, remove the legacy `X-API-Key` path from
+`middleware/access.ts` and the `API_KEY?: string` from `Bindings`.
+
+**Step 8: Commit config changes**
 
 ```bash
 git add api/wrangler.toml
