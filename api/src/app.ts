@@ -1,6 +1,5 @@
 import { Hono } from "hono";
-import { cors } from "hono/cors";
-import { apiKeyAuth } from "./middleware/auth";
+import { accessAuth } from "./middleware/access";
 import batches from "./routes/batches";
 import activities from "./routes/activities";
 import devices from "./routes/devices";
@@ -10,23 +9,20 @@ import { batchReadings, deviceReadings } from "./routes/readings";
 
 export type Bindings = {
   DB: D1Database;
-  API_KEY: string;
+  CF_ACCESS_AUD: string;
+  CF_ACCESS_TEAM: string;
   WEBHOOK_TOKEN: string;
+  API_KEY?: string; // Legacy — kept during rollout, removed after
 };
 
-export type App = Hono<{ Bindings: Bindings }>;
+export type User = { id: string; email: string; name: string | null };
 
-const app = new Hono<{ Bindings: Bindings }>();
+export type AppEnv = { Bindings: Bindings; Variables: { user: User } };
 
-app.use(
-  "*",
-  cors({
-    origin: "*",
-    allowHeaders: ["X-API-Key", "X-Webhook-Token", "Content-Type"],
-    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-  }),
-);
-app.use("*", apiKeyAuth);
+const app = new Hono<AppEnv>();
+
+// No CORS needed — same origin
+app.use("*", accessAuth);
 
 app.get("/health", (c) => c.json({ status: "ok" }));
 app.route("/api/v1/batches", batches);
