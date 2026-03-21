@@ -25,15 +25,18 @@ webhook.post("/rapt", async (c) => {
   const now = nowUtc();
   const body = parsed.data;
 
-  // Auto-register unknown device; resolve batch_id
-  const device = await db.prepare("SELECT batch_id FROM devices WHERE id = ?").bind(body.device_id).first<any>();
+  // Auto-register unknown device; resolve batch_id and user_id
+  const device = await db.prepare("SELECT batch_id, user_id FROM devices WHERE id = ?").bind(body.device_id).first<any>();
   let batchId: string | null;
+  let userId: string | null;
   if (!device) {
-    await db.prepare("INSERT INTO devices (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
+    await db.prepare("INSERT INTO devices (id, name, user_id, created_at, updated_at) VALUES (?, ?, NULL, ?, ?)")
       .bind(body.device_id, body.device_name, now, now).run();
     batchId = null;
+    userId = null;
   } else {
     batchId = device.batch_id;
+    userId = device.user_id;
   }
 
   // Insert reading, deduplicate via UNIQUE index
@@ -41,11 +44,11 @@ webhook.post("/rapt", async (c) => {
   try {
     await db
       .prepare(
-        `INSERT INTO readings (id, batch_id, device_id, gravity, temperature, battery, rssi, source_timestamp, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO readings (id, batch_id, device_id, gravity, temperature, battery, rssi, source_timestamp, created_at, user_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(readingId, batchId, body.device_id, body.gravity, body.temperature,
-        body.battery, body.rssi, body.created_date, now)
+        body.battery, body.rssi, body.created_date, now, userId)
       .run();
   } catch (e: any) {
     if (String(e).includes("UNIQUE")) {
