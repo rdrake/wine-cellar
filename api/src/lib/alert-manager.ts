@@ -2,6 +2,7 @@
 
 import type { AlertCandidate, AlertType } from "./alerts";
 import { nowUtc } from "./time";
+import { sendPushToUser, type PushPayload } from "./web-push";
 
 export interface FiredAlert {
   id: string;
@@ -126,4 +127,40 @@ export async function getActiveAlerts(
     .all();
 
   return results;
+}
+
+const ALERT_LABELS: Record<string, string> = {
+  stall: "Fermentation Stall",
+  no_readings: "No Readings",
+  temp_high: "High Temperature",
+  temp_low: "Low Temperature",
+  stage_suggestion: "Stage Suggestion",
+};
+
+export async function sendAlertPushes(
+  db: D1Database,
+  userId: string,
+  batchName: string,
+  firedAlerts: FiredAlert[],
+  vapidPublicKey: string,
+  vapidPrivateKey: string,
+): Promise<void> {
+  for (const alert of firedAlerts) {
+    const context = alert.context ? JSON.parse(alert.context) : {};
+    const payload: PushPayload = {
+      title: `${batchName} — ${ALERT_LABELS[alert.alert_type] ?? alert.alert_type}`,
+      body: context.message ?? ALERT_LABELS[alert.alert_type] ?? alert.alert_type,
+      url: `/batches/${alert.batch_id}`,
+      type: alert.alert_type,
+      alertId: alert.id,
+    };
+
+    if (alert.alert_type === "stage_suggestion" && context.next_stage) {
+      payload.url = `/batches/${alert.batch_id}?action=advance&stage=${context.next_stage}`;
+      payload.batchId = alert.batch_id;
+      payload.nextStage = context.next_stage;
+    }
+
+    await sendPushToUser(db, userId, payload, vapidPublicKey, vapidPrivateKey);
+  }
 }

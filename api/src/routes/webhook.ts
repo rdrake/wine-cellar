@@ -5,7 +5,7 @@ import { unauthorized, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
 import { timingSafeEqual } from "../lib/crypto";
 import { evaluateAlerts, type BatchAlertContext } from "../lib/alerts";
-import { processAlerts, resolveCleared } from "../lib/alert-manager";
+import { processAlerts, resolveCleared, sendAlertPushes } from "../lib/alert-manager";
 
 const webhook = new Hono<{ Bindings: Bindings }>();
 
@@ -79,8 +79,15 @@ webhook.post("/rapt", async (c) => {
       };
 
       const candidates = evaluateAlerts(ctx);
-      await processAlerts(db, userId, batchId, candidates);
+      const fired = await processAlerts(db, userId, batchId, candidates);
       await resolveCleared(db, userId, batchId, candidates);
+
+      if (fired.length > 0) {
+        const batchRow = await db.prepare("SELECT name FROM batches WHERE id = ?").bind(batchId).first<any>();
+        if (batchRow) {
+          await sendAlertPushes(db, userId, batchRow.name, fired, c.env.VAPID_PUBLIC_KEY, c.env.VAPID_PRIVATE_KEY);
+        }
+      }
     }
   }
 

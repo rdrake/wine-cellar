@@ -1,9 +1,13 @@
 import { evaluateAlerts, type BatchAlertContext } from "./lib/alerts";
-import { processAlerts, resolveCleared } from "./lib/alert-manager";
+import { processAlerts, resolveCleared, sendAlertPushes } from "./lib/alert-manager";
 
-export async function evaluateAllBatches(db: D1Database): Promise<void> {
+export async function evaluateAllBatches(
+  db: D1Database,
+  vapidPublicKey: string,
+  vapidPrivateKey: string,
+): Promise<void> {
   const batches = await db.prepare(
-    "SELECT b.id, b.user_id, b.stage, b.target_gravity FROM batches b WHERE b.status = 'active'"
+    "SELECT b.id, b.user_id, b.name, b.stage, b.target_gravity FROM batches b WHERE b.status = 'active'"
   ).all<any>();
 
   for (const batch of batches.results) {
@@ -25,7 +29,11 @@ export async function evaluateAllBatches(db: D1Database): Promise<void> {
     };
 
     const candidates = evaluateAlerts(ctx);
-    await processAlerts(db, batch.user_id, batch.id, candidates);
+    const fired = await processAlerts(db, batch.user_id, batch.id, candidates);
     await resolveCleared(db, batch.user_id, batch.id, candidates);
+
+    if (fired.length > 0) {
+      await sendAlertPushes(db, batch.user_id, batch.name, fired, vapidPublicKey, vapidPrivateKey);
+    }
   }
 }
