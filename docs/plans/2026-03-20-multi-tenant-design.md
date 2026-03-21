@@ -248,28 +248,6 @@ CREATE TABLE batches_new (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-INSERT INTO batches_new SELECT 'owner-uuid-here', id, name, wine_type, source_material, stage, status, volume_liters, target_volume_liters, started_at, completed_at, notes, created_at, updated_at FROM batches;
-
--- Wait — INSERT column order must match. Use explicit columns:
--- Actually, the above is wrong. Let me fix:
-DROP TABLE batches_new;
-
-CREATE TABLE batches_new (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id),
-  name TEXT NOT NULL,
-  wine_type TEXT NOT NULL CHECK (wine_type IN ('red', 'white', 'rosé', 'orange', 'sparkling', 'dessert')),
-  source_material TEXT NOT NULL CHECK (source_material IN ('kit', 'juice_bucket', 'fresh_grapes')),
-  stage TEXT NOT NULL DEFAULT 'must_prep' CHECK (stage IN ('must_prep', 'primary_fermentation', 'secondary_fermentation', 'stabilization', 'bottling')),
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'archived', 'abandoned')),
-  volume_liters REAL,
-  target_volume_liters REAL,
-  started_at TEXT NOT NULL,
-  completed_at TEXT,
-  notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
 
 INSERT INTO batches_new (id, user_id, name, wine_type, source_material, stage, status, volume_liters, target_volume_liters, started_at, completed_at, notes, created_at, updated_at)
   SELECT id, 'owner-uuid-here', name, wine_type, source_material, stage, status, volume_liters, target_volume_liters, started_at, completed_at, notes, created_at, updated_at
