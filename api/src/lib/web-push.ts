@@ -101,34 +101,24 @@ async function hkdf(
   info: Uint8Array,
   length: number,
 ): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey("raw", ikm, { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-  ]);
-  const prk = new Uint8Array(await crypto.subtle.sign("HMAC", key, salt.length > 0 ? salt : ikm));
-  // Actually: HKDF-Extract(salt, IKM) = HMAC-Hash(salt, IKM)
-  const prkKey = await crypto.subtle.importKey(
+  // Extract: PRK = HMAC-SHA256(salt, IKM)
+  const saltKey = await crypto.subtle.importKey(
     "raw",
-    salt.length > 0
-      ? new Uint8Array(
-          await crypto.subtle.sign(
-            "HMAC",
-            await crypto.subtle.importKey(
-              "raw",
-              salt,
-              { name: "HMAC", hash: "SHA-256" },
-              false,
-              ["sign"],
-            ),
-            ikm,
-          ),
-        )
-      : prk,
+    salt,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
   );
+  const prk = new Uint8Array(await crypto.subtle.sign("HMAC", saltKey, ikm));
 
-  // HKDF-Expand: T(1) = HMAC-Hash(PRK, info || 0x01)
+  // Expand: T(1) = HMAC-SHA256(PRK, info || 0x01)
+  const prkKey = await crypto.subtle.importKey(
+    "raw",
+    prk,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
   const infoWithCounter = new Uint8Array(info.length + 1);
   infoWithCounter.set(info);
   infoWithCounter[info.length] = 1;
@@ -147,25 +137,6 @@ function concat(...arrays: Uint8Array[]): Uint8Array {
     offset += arr.length;
   }
   return result;
-}
-
-function createInfo(
-  type: string,
-  clientPublicKey: Uint8Array,
-  serverPublicKey: Uint8Array,
-): Uint8Array {
-  const encoder = new TextEncoder();
-  const typeBytes = encoder.encode(type);
-  // "Content-Encoding: <type>\0" || "P-256\0" || client_key_length || client_key || server_key_length || server_key
-  const header = encoder.encode("Content-Encoding: ");
-  const nul = new Uint8Array([0]);
-  const p256 = encoder.encode("P-256");
-  const clientLen = new Uint8Array(2);
-  new DataView(clientLen.buffer).setUint16(0, clientPublicKey.length);
-  const serverLen = new Uint8Array(2);
-  new DataView(serverLen.buffer).setUint16(0, serverPublicKey.length);
-
-  return concat(header, typeBytes, nul, p256, nul, clientLen, clientPublicKey, serverLen, serverPublicKey);
 }
 
 async function encrypt(
@@ -204,17 +175,17 @@ async function encrypt(
   // Generate 16-byte salt
   const salt = crypto.getRandomValues(new Uint8Array(16));
 
-  // IKM = HKDF(auth_secret, shared_secret, "Content-Encoding: auth\0", 32)
-  const authInfo = new TextEncoder().encode("Content-Encoding: auth\0");
-  const ikm = await hkdf(authSecret, sharedSecret, authInfo, 32);
+  const enc = new TextEncoder();
 
-  // Content encryption key = HKDF(salt, IKM, cek_info, 16)
-  const cekInfo = createInfo("aes128gcm", subscriberPubKey, serverPubRaw);
-  const cek = await hkdf(salt, ikm, cekInfo, 16);
+  // RFC 8291 §3.4: IKM = HKDF(auth_secret, ecdh_secret, "WebPush: info" || 0x00 || ua_public || as_public, 32)
+  const keyInfo = concat(enc.encode("WebPush: info"), new Uint8Array([0]), subscriberPubKey, serverPubRaw);
+  const ikm = await hkdf(authSecret, sharedSecret, keyInfo, 32);
 
-  // Nonce = HKDF(salt, IKM, nonce_info, 12)
-  const nonceInfo = createInfo("nonce", subscriberPubKey, serverPubRaw);
-  const nonce = await hkdf(salt, ikm, nonceInfo, 12);
+  // RFC 8188 §2.2: CEK = HKDF(salt, IKM, "Content-Encoding: aes128gcm\0", 16)
+  const cek = await hkdf(salt, ikm, enc.encode("Content-Encoding: aes128gcm\0"), 16);
+
+  // RFC 8188 §2.3: NONCE = HKDF(salt, IKM, "Content-Encoding: nonce\0", 12)
+  const nonce = await hkdf(salt, ikm, enc.encode("Content-Encoding: nonce\0"), 12);
 
   // Pad plaintext: add delimiter 0x02 (single record, last record)
   const padded = concat(plaintext, new Uint8Array([2]));
@@ -314,7 +285,8 @@ export async function sendPushToUser(
 
   for (const sub of subs.results) {
     const result = await sendPush(sub, payload, pubRaw, privD);
-    if (result.gone) {
+    // 404/410 = expired subscription, 401/403 = VAPID key mismatch (e.g. after key rotation)
+    if (result.gone || result.status === 401 || result.status === 403) {
       await db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").bind(sub.endpoint).run();
     }
   }
