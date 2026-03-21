@@ -15,7 +15,8 @@ export default defineWorkersConfig({
         miniflare: {
           d1Databases: { DB: "wine-cellar-test" },
           bindings: {
-            API_KEY: "test-api-key",
+            CF_ACCESS_AUD: "test-aud",
+            CF_ACCESS_TEAM: "test",
             WEBHOOK_TOKEN: "test-webhook-token",
             MIGRATION_SQL: migrationSql,
           },

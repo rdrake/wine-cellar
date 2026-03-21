@@ -1,6 +1,13 @@
 import { env, SELF } from "cloudflare:test";
 
-export const API_HEADERS = { "X-API-Key": "test-api-key" };
+export const TEST_USER_EMAIL = "test@example.com";
+export const TEST_USER_B_EMAIL = "other@example.com";
+
+export function authHeaders(email: string = TEST_USER_EMAIL): Record<string, string> {
+  return { "Cf-Access-Jwt-Assertion": `test-jwt-for:${email}` };
+}
+
+export const API_HEADERS = authHeaders(); // backward compat alias
 export const WEBHOOK_HEADERS = { "X-Webhook-Token": "test-webhook-token" };
 
 export const VALID_BATCH = {
@@ -15,7 +22,6 @@ export const VALID_BATCH = {
 
 export async function applyMigrations() {
   const sql = (env as any).MIGRATION_SQL as string;
-  // Strip comment-only lines, split on semicolons, run each statement
   const cleaned = sql
     .split("\n")
     .filter((line: string) => {
@@ -59,10 +65,10 @@ export async function fetchJson(
   return { status, json: json as any };
 }
 
-export async function createBatch(overrides: Record<string, unknown> = {}) {
+export async function createBatch(overrides: Record<string, unknown> = {}, email?: string) {
   const { json } = await fetchJson("/api/v1/batches", {
     method: "POST",
-    headers: API_HEADERS,
+    headers: authHeaders(email),
     body: { ...VALID_BATCH, ...overrides },
   });
   return json.id as string;
