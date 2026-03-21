@@ -74,7 +74,7 @@ push.delete("/subscribe", async (c) => {
 push.post("/test", async (c) => {
   const user = c.get("user");
   await sendPushToUser(c.env.DB, user.id, {
-    title: "Wine Cellar",
+    title: "Test Notification",
     body: "Push notifications are working!",
     url: "/settings",
     type: "test",
