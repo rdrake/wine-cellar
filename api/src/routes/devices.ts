@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import type { Bindings } from "../app";
+import type { AppEnv } from "../app";
 import { DeviceCreateSchema, DeviceAssignSchema } from "../models";
 import { notFound, conflict, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
 
-const devices = new Hono<{ Bindings: Bindings }>();
+const devices = new Hono<AppEnv>();
 
 devices.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -12,11 +12,12 @@ devices.post("/", async (c) => {
   if (!parsed.success) return validationError(parsed.error.issues);
 
   const db = c.env.DB;
+  const user = c.get("user");
   const now = nowUtc();
   try {
     await db
-      .prepare("INSERT INTO devices (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
-      .bind(parsed.data.id, parsed.data.name, now, now)
+      .prepare("INSERT INTO devices (id, name, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .bind(parsed.data.id, parsed.data.name, user.id, now, now)
       .run();
   } catch (e: any) {
     if (String(e).includes("UNIQUE")) return conflict("Device already registered");
@@ -29,21 +30,46 @@ devices.post("/", async (c) => {
 });
 
 devices.get("/", async (c) => {
-  const result = await c.env.DB.prepare("SELECT * FROM devices ORDER BY created_at DESC").all();
+  const user = c.get("user");
+  const result = await c.env.DB.prepare("SELECT * FROM devices WHERE user_id = ? ORDER BY created_at DESC").bind(user.id).all();
   return c.json({ items: result.results });
+});
+
+devices.post("/claim", async (c) => {
+  const db = c.env.DB;
+  const user = c.get("user");
+  const body = await c.req.json().catch(() => null);
+  if (!body?.device_id) return validationError([{ message: "device_id required" }]);
+
+  // Check device exists and is unclaimed
+  const device = await db.prepare("SELECT * FROM devices WHERE id = ? AND user_id IS NULL")
+    .bind(body.device_id).first();
+  if (!device) return notFound("Device not found or already claimed");
+
+  const now = nowUtc();
+  await db.batch([
+    db.prepare("UPDATE devices SET user_id = ?, updated_at = ? WHERE id = ?")
+      .bind(user.id, now, body.device_id),
+    db.prepare("UPDATE readings SET user_id = ? WHERE device_id = ? AND user_id IS NULL")
+      .bind(user.id, body.device_id),
+  ]);
+
+  const updated = await db.prepare("SELECT * FROM devices WHERE id = ?").bind(body.device_id).first();
+  return c.json(updated);
 });
 
 devices.post("/:deviceId/assign", async (c) => {
   const db = c.env.DB;
+  const user = c.get("user");
   const deviceId = c.req.param("deviceId");
-  const device = await db.prepare("SELECT * FROM devices WHERE id = ?").bind(deviceId).first();
+  const device = await db.prepare("SELECT * FROM devices WHERE id = ? AND user_id = ?").bind(deviceId, user.id).first();
   if (!device) return notFound("Device");
 
   const body = await c.req.json().catch(() => null);
   const parsed = DeviceAssignSchema.safeParse(body);
   if (!parsed.success) return validationError(parsed.error.issues);
 
-  const batch = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(parsed.data.batch_id).first<any>();
+  const batch = await db.prepare("SELECT * FROM batches WHERE id = ? AND user_id = ?").bind(parsed.data.batch_id, user.id).first<any>();
   if (!batch) return notFound("Batch");
   if (batch.status !== "active") return conflict("Can only assign to active batches");
 
@@ -61,8 +87,9 @@ devices.post("/:deviceId/assign", async (c) => {
 
 devices.post("/:deviceId/unassign", async (c) => {
   const db = c.env.DB;
+  const user = c.get("user");
   const deviceId = c.req.param("deviceId");
-  const device = await db.prepare("SELECT * FROM devices WHERE id = ?").bind(deviceId).first();
+  const device = await db.prepare("SELECT * FROM devices WHERE id = ? AND user_id = ?").bind(deviceId, user.id).first();
   if (!device) return notFound("Device");
 
   const now = nowUtc();

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
-import { applyMigrations, fetchJson, createBatch, API_HEADERS } from "./helpers";
+import { applyMigrations, fetchJson, createBatch, API_HEADERS, authHeaders, WEBHOOK_HEADERS } from "./helpers";
 
 beforeEach(async () => {
   await applyMigrations();
@@ -59,6 +59,28 @@ describe("devices", () => {
     });
     expect(status).toBe(200);
     expect(json.batch_id).toBeNull();
+  });
+
+  it("claims an unclaimed device and backfills readings", async () => {
+    // Setup: webhook creates unclaimed device + readings
+    await fetchJson("/webhook/rapt", {
+      method: "POST",
+      headers: WEBHOOK_HEADERS,
+      body: { device_id: "pill-claim-1", device_name: "Claim Test", temperature: 22, gravity: 1.050, battery: 90, rssi: -50, created_date: "2026-03-20T10:00:00Z" },
+    });
+
+    // Claim it
+    const { status, json } = await fetchJson("/api/v1/devices/claim", {
+      method: "POST",
+      headers: authHeaders(),
+      body: { device_id: "pill-claim-1" },
+    });
+    expect(status).toBe(200);
+    expect(json.user_id).toBeDefined();
+
+    // Verify device now appears in user's list
+    const { json: list } = await fetchJson("/api/v1/devices", { headers: authHeaders() });
+    expect(list.items.some((d: any) => d.id === "pill-claim-1")).toBe(true);
   });
 
   it("assign backfills readings", async () => {
