@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
@@ -227,6 +227,106 @@ function ClaimSection({ onClaimed }: { onClaimed: () => void }) {
   );
 }
 
+// ── Notifications ────────────────────────────────────────────────────
+
+function NotificationsSection() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Check current subscription state on mount
+  useEffect(() => {
+    async function check() {
+      try {
+        if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+          setEnabled(false);
+          setLoading(false);
+          return;
+        }
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        setEnabled(!!sub);
+      } catch {
+        setEnabled(false);
+      }
+      setLoading(false);
+    }
+    check();
+  }, []);
+
+  async function toggle() {
+    if (enabled === null) return;
+    setLoading(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (enabled) {
+        // Unsubscribe
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await api.push.unsubscribe(sub.endpoint);
+          await sub.unsubscribe();
+        }
+        setEnabled(false);
+        toast.success("Notifications disabled");
+      } else {
+        // Subscribe
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          toast.error("Notification permission denied");
+          setLoading(false);
+          return;
+        }
+        const { key } = await api.push.vapidKey();
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: key,
+        });
+        const json = sub.toJSON();
+        await api.push.subscribe({
+          endpoint: sub.endpoint,
+          keys: {
+            p256dh: json.keys!.p256dh!,
+            auth: json.keys!.auth!,
+          },
+        });
+        setEnabled(true);
+        toast.success("Notifications enabled");
+      }
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update notification settings");
+    }
+    setLoading(false);
+  }
+
+  const supported = "serviceWorker" in navigator && "PushManager" in window;
+
+  return (
+    <div className="space-y-2">
+      {!supported ? (
+        <p className="text-xs text-muted-foreground">
+          Push notifications are not supported in this browser.
+        </p>
+      ) : (
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm">Push Notifications</p>
+            <p className="text-xs text-muted-foreground">
+              Get alerts for fermentation stalls, temperature issues, and stage suggestions.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant={enabled ? "outline" : "default"}
+            disabled={loading}
+            onClick={toggle}
+          >
+            {loading ? "..." : enabled ? "Disable" : "Enable"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────
 
 export default function Settings() {
@@ -290,6 +390,12 @@ export default function Settings() {
       <section>
         <h2 className="text-sm font-semibold mb-2">Claim Device</h2>
         <ClaimSection onClaimed={refetch} />
+      </section>
+
+      {/* Notifications */}
+      <section>
+        <h2 className="text-sm font-semibold mb-2">Notifications</h2>
+        <NotificationsSection />
       </section>
 
       {assignDialog && (
