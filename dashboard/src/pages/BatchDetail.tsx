@@ -87,7 +87,7 @@ function BatchSnapshot({ batch, readings, device }: {
             )}
             {currentAbv != null && <Stat label="Est. ABV" value={currentAbv.toFixed(1)} unit="%" />}
             {att != null && <Stat label="Attenuation" value={att.toFixed(0)} unit="%" />}
-            <Stat label="OG \u2192 SG" value={`${og!.toFixed(3)} \u2192 ${sg!.toFixed(3)}`} />
+            <Stat label={"OG \u2192 SG"} value={`${og!.toFixed(3)} \u2192 ${sg!.toFixed(3)}`} />
             {vel !== null && (
               <Stat
                 label="Gravity change (48h)"
