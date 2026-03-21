@@ -5,31 +5,6 @@ import type {
   ListResponse, PaginatedResponse, DashboardResponse,
 } from "./types";
 
-const STORAGE_KEY_URL = "wine-cellar-api-url";
-const STORAGE_KEY_KEY = "wine-cellar-api-key";
-
-export function getApiConfig(): { url: string | null; key: string | null } {
-  return {
-    url: localStorage.getItem(STORAGE_KEY_URL),
-    key: localStorage.getItem(STORAGE_KEY_KEY),
-  };
-}
-
-export function setApiConfig(url: string, key: string): void {
-  localStorage.setItem(STORAGE_KEY_URL, url.replace(/\/$/, ""));
-  localStorage.setItem(STORAGE_KEY_KEY, key);
-}
-
-export function clearApiConfig(): void {
-  localStorage.removeItem(STORAGE_KEY_URL);
-  localStorage.removeItem(STORAGE_KEY_KEY);
-}
-
-export function isConfigured(): boolean {
-  const { url, key } = getApiConfig();
-  return !!url && !!key;
-}
-
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -50,26 +25,20 @@ function qs(params?: Record<string, string | number | undefined>): string {
 }
 
 async function apiFetch<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
-  const { url, key } = getApiConfig();
-  if (!url || !key) throw new Error("API not configured");
-
   const { method = "GET", body } = options;
   const headers = new Headers();
-  headers.set("X-API-Key", key);
   if (body !== undefined) headers.set("Content-Type", "application/json");
 
-  const res = await fetch(`${url}${path}`, {
+  const res = await fetch(path, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
+  // 401 means Access session expired — reload triggers Access login
   if (res.status === 401) {
-    // Only clear the key, not the URL — user can re-enter key on the setup screen
-    localStorage.removeItem(STORAGE_KEY_KEY);
-    // Redirect to setup so AuthGuard re-evaluates
-    window.location.replace("/setup");
-    throw new ApiError(401, { error: "unauthorized", message: "Invalid or missing API key" });
+    window.location.reload();
+    throw new ApiError(401, { error: "unauthorized", message: "Session expired" });
   }
 
   if (res.status === 204) return undefined as T;
@@ -127,7 +96,10 @@ export const api = {
       apiFetch<Device>(`/api/v1/devices/${deviceId}/assign`, { method: "POST", body: { batch_id: batchId } }),
     unassign: (deviceId: string) =>
       apiFetch<Device>(`/api/v1/devices/${deviceId}/unassign`, { method: "POST" }),
+    claim: (deviceId: string) =>
+      apiFetch<Device>("/api/v1/devices/claim", { method: "POST", body: { device_id: deviceId } }),
   },
   dashboard: () => apiFetch<DashboardResponse>("/api/v1/dashboard"),
   health: () => apiFetch<{ status: string }>("/health"),
+  me: () => apiFetch<{ id: string; email: string; name: string | null }>("/api/v1/me"),
 };

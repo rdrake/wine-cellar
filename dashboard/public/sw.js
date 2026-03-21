@@ -1,4 +1,4 @@
-const CACHE_NAME = "wine-cellar-v2";
+const CACHE_NAME = "wine-cellar-v3";
 const STATIC_ASSETS = ["/", "/index.html"];
 
 self.addEventListener("install", (event) => {
