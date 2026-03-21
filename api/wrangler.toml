@@ -13,3 +13,6 @@ CF_ACCESS_TEAM = "rdrake"
 binding = "DB"
 database_name = "wine-cellar-api"
 database_id = "08d5d178-c4f1-4be2-9906-5acea05682ae"
+
+[triggers]
+crons = ["*/15 * * * *"]
