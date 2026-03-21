@@ -1,8 +1,15 @@
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
 import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import type { Batch, Reading, Device } from "@/types";
+import type { Batch, BatchStage, Reading, Device } from "@/types";
 import { STAGE_LABELS, WINE_TYPE_LABELS, SOURCE_MATERIAL_LABELS, STATUS_LABELS } from "@/types";
 import ActivitySection from "@/components/ActivitySection";
 import ReadingsChart from "@/components/ReadingsChart";
@@ -140,6 +147,19 @@ function BatchSnapshot({ batch, readings, device }: {
 
 // ── Lifecycle Actions ────────────────────────────────────────────────
 
+const WAYPOINTS: BatchStage[] = [
+  "must_prep",
+  "primary_fermentation",
+  "secondary_fermentation",
+  "stabilization",
+  "bottling",
+];
+
+function nextStage(current: BatchStage): BatchStage {
+  const idx = WAYPOINTS.indexOf(current);
+  return idx < WAYPOINTS.length - 1 ? WAYPOINTS[idx + 1] : current;
+}
+
 function LifecycleActions({ batch, batchId, onAction, onDeleted }: {
   batch: Batch;
   batchId: string;
@@ -148,6 +168,7 @@ function LifecycleActions({ batch, batchId, onAction, onDeleted }: {
 }) {
   const [confirmAction, setConfirmAction] = useState<{ label: string; verb: string; verbing: string; action: () => Promise<void> } | null>(null);
   const [acting, setActing] = useState(false);
+  const [selectedStage, setSelectedStage] = useState<BatchStage>(nextStage(batch.stage));
 
   async function doAction(label: string, action: () => Promise<Batch>) {
     setActing(true);
@@ -169,11 +190,28 @@ function LifecycleActions({ batch, batchId, onAction, onDeleted }: {
 
   return (
     <>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         {batch.status === "active" && (
           <>
-            <Button size="sm" onClick={() => doAction("Stage advanced", () => api.batches.advance(batch.id))}>
-              Advance Stage
+            <Select value={selectedStage} onValueChange={(v) => setSelectedStage(v as BatchStage)}>
+              <SelectTrigger size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WAYPOINTS.map((s) => (
+                  <SelectItem key={s} value={s}>{STAGE_LABELS[s]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              disabled={acting || selectedStage === batch.stage}
+              onClick={() => doAction(
+                `Stage set to ${STAGE_LABELS[selectedStage]}`,
+                () => api.batches.setStage(batch.id, selectedStage),
+              )}
+            >
+              {acting ? "Setting..." : "Set Stage"}
             </Button>
             <Button size="sm" variant="outline" onClick={() => doAction("Batch completed", () => api.batches.complete(batch.id))}>
               Complete
@@ -248,12 +286,48 @@ function LifecycleActions({ batch, batchId, onAction, onDeleted }: {
 export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [notesOpen, setNotesOpen] = useState(false);
+  const actionHandled = useRef(false);
 
   const { data: batch, loading, error, refetch } = useFetch(
     () => api.batches.get(id!),
     [id],
   );
+
+  // Handle query param actions from push notifications
+  useEffect(() => {
+    if (actionHandled.current) return;
+    const action = searchParams.get("action");
+    if (!action) return;
+
+    actionHandled.current = true;
+
+    if (action === "advance") {
+      const stage = searchParams.get("stage");
+      if (stage) {
+        api.batches.setStage(id!, stage).then(() => {
+          toast.success(`Stage set to ${STAGE_LABELS[stage as BatchStage] ?? stage}`);
+          refetch();
+        }).catch((e: unknown) => {
+          toast.error(e instanceof Error ? e.message : "Failed to set stage");
+        }).finally(() => {
+          setSearchParams({}, { replace: true });
+        });
+      }
+    } else if (action === "dismiss") {
+      const alertId = searchParams.get("alertId");
+      if (alertId) {
+        api.alerts.dismiss(alertId).then(() => {
+          toast.success("Alert dismissed");
+        }).catch((e: unknown) => {
+          toast.error(e instanceof Error ? e.message : "Failed to dismiss alert");
+        }).finally(() => {
+          setSearchParams({}, { replace: true });
+        });
+      }
+    }
+  }, [searchParams, id, refetch, setSearchParams]);
 
   const { data: readingsData, refetch: refetchReadings } = useFetch(
     () => api.readings.listByBatch(id!, { limit: 500 }),
