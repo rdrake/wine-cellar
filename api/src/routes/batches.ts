@@ -26,11 +26,11 @@ batches.post("/", async (c) => {
   await db
     .prepare(
       `INSERT INTO batches (id, user_id, name, wine_type, source_material, stage, status,
-       volume_liters, target_volume_liters, started_at, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 'must_prep', 'active', ?, ?, ?, ?, ?, ?)`
+       volume_liters, target_volume_liters, target_gravity, started_at, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'must_prep', 'active', ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(id, user.id, b.name, b.wine_type, b.source_material,
-      b.volume_liters ?? null, b.target_volume_liters ?? null,
+      b.volume_liters ?? null, b.target_volume_liters ?? null, b.target_gravity ?? null,
       b.started_at, b.notes ?? null, now, now)
     .run();
 
@@ -99,7 +99,7 @@ batches.patch("/:batchId", async (c) => {
     }
   }
 
-  const allowedCols = ["name", "notes", "volume_liters", "target_volume_liters", "status"] as const;
+  const allowedCols = ["name", "notes", "volume_liters", "target_volume_liters", "target_gravity", "status"] as const;
   const updates: Record<string, unknown> = {};
   for (const col of allowedCols) {
     if (parsed.data[col] !== undefined) {

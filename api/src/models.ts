@@ -17,6 +17,7 @@ export const BatchCreateSchema = z.object({
   started_at: z.string(),
   volume_liters: z.number().nullable().optional(),
   target_volume_liters: z.number().nullable().optional(),
+  target_gravity: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 export type BatchCreate = z.infer<typeof BatchCreateSchema>;
@@ -26,6 +27,7 @@ export const BatchUpdateSchema = z.object({
   notes: z.string().nullable().optional(),
   volume_liters: z.number().nullable().optional(),
   target_volume_liters: z.number().nullable().optional(),
+  target_gravity: z.number().nullable().optional(),
   status: z.enum(BATCH_STATUSES).optional(),
 });
 export type BatchUpdate = z.infer<typeof BatchUpdateSchema>;

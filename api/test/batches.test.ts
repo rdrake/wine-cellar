@@ -90,6 +90,24 @@ describe("batches CRUD", () => {
     expect(status).toBe(404);
   });
 
+  it("creates batch with target_gravity", async () => {
+    const { status, json } = await fetchJson("/api/v1/batches", {
+      method: "POST", headers: API_HEADERS,
+      body: { ...VALID_BATCH, target_gravity: 0.996 },
+    });
+    expect(status).toBe(201);
+    expect(json.target_gravity).toBe(0.996);
+  });
+
+  it("updates target_gravity", async () => {
+    const batchId = await createBatch();
+    const { status, json } = await fetchJson(`/api/v1/batches/${batchId}`, {
+      method: "PATCH", headers: API_HEADERS, body: { target_gravity: 1.000 },
+    });
+    expect(status).toBe(200);
+    expect(json.target_gravity).toBe(1.0);
+  });
+
   it("user A cannot see user B's batches", async () => {
     const idA = await createBatch({ name: "User A Batch" }, "a@example.com");
     const idB = await createBatch({ name: "User B Batch" }, "b@example.com");
