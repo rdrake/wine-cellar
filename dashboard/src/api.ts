@@ -1,7 +1,7 @@
 import type {
   Batch, BatchCreate, BatchUpdate, BatchStatus, BatchStage, WineType,
   Activity, ActivityCreate, ActivityUpdate, ActivityType, AllStage,
-  Reading, Device,
+  Reading, Device, Alert,
   ListResponse, PaginatedResponse, DashboardResponse,
 } from "./types";
 
@@ -62,6 +62,8 @@ export const api = {
       apiFetch<void>(`/api/v1/batches/${id}`, { method: "DELETE" }),
     advance: (id: string) =>
       apiFetch<Batch>(`/api/v1/batches/${id}/advance`, { method: "POST" }),
+    setStage: (id: string, stage: string) =>
+      apiFetch<Batch>(`/api/v1/batches/${id}/stage`, { method: "POST", body: { stage } }),
     complete: (id: string) =>
       apiFetch<Batch>(`/api/v1/batches/${id}/complete`, { method: "POST" }),
     abandon: (id: string) =>
@@ -98,6 +100,17 @@ export const api = {
       apiFetch<Device>(`/api/v1/devices/${deviceId}/unassign`, { method: "POST" }),
     claim: (deviceId: string) =>
       apiFetch<Device>("/api/v1/devices/claim", { method: "POST", body: { device_id: deviceId } }),
+  },
+  alerts: {
+    dismiss: (alertId: string) =>
+      apiFetch<{ status: string }>(`/api/v1/alerts/${alertId}/dismiss`, { method: "POST" }),
+  },
+  push: {
+    vapidKey: () => apiFetch<{ key: string }>("/api/v1/push/vapid-key"),
+    subscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+      apiFetch<{ status: string }>("/api/v1/push/subscribe", { method: "POST", body: subscription }),
+    unsubscribe: (endpoint: string) =>
+      apiFetch<{ status: string }>("/api/v1/push/subscribe", { method: "DELETE", body: { endpoint } }),
   },
   dashboard: () => apiFetch<DashboardResponse>("/api/v1/dashboard"),
   health: () => apiFetch<{ status: string }>("/health"),

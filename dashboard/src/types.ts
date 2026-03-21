@@ -28,6 +28,7 @@ export interface Batch {
   status: BatchStatus;
   volume_liters: number | null;
   target_volume_liters: number | null;
+  target_gravity: number | null;
   started_at: string;
   completed_at: string | null;
   notes: string | null;
@@ -97,6 +98,16 @@ export interface BatchSummary extends Batch {
 export interface DashboardResponse {
   active_batches: BatchSummary[];
   recent_activities: (Activity & { batch_name: string })[];
+  alerts: Alert[];
+}
+
+export interface Alert {
+  id: string;
+  batch_id: string;
+  batch_name: string;
+  alert_type: "stall" | "no_readings" | "temp_high" | "temp_low" | "stage_suggestion";
+  context: string | null;
+  fired_at: string;
 }
 
 export interface BatchCreate {
@@ -106,6 +117,7 @@ export interface BatchCreate {
   started_at: string;
   volume_liters?: number | null;
   target_volume_liters?: number | null;
+  target_gravity?: number | null;
   notes?: string | null;
 }
 
@@ -114,6 +126,7 @@ export interface BatchUpdate {
   notes?: string | null;
   volume_liters?: number | null;
   target_volume_liters?: number | null;
+  target_gravity?: number | null;
   status?: BatchStatus;
 }
 
