@@ -1,11 +1,11 @@
 import { Hono } from "hono";
-import type { Bindings } from "../app";
+import type { AppEnv } from "../app";
 import { ActivityCreateSchema, ActivityUpdateSchema } from "../models";
 import { WAYPOINT_ALLOWED_STAGES, type BatchStage } from "../schema";
 import { notFound, conflict, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
 
-const activities = new Hono<{ Bindings: Bindings }>();
+const activities = new Hono<AppEnv>();
 
 function isSgMeasurement(type: string, details: Record<string, unknown> | null | undefined): details is Record<string, unknown> {
   return type === "measurement" && !!details && details.metric === "SG" && typeof details.value === "number";
@@ -13,8 +13,9 @@ function isSgMeasurement(type: string, details: Record<string, unknown> | null |
 
 activities.post("/", async (c) => {
   const db = c.env.DB;
+  const user = c.get("user");
   const batchId = c.req.param("batchId");
-  const batch = await db.prepare("SELECT * FROM batches WHERE id = ?").bind(batchId).first<any>();
+  const batch = await db.prepare("SELECT * FROM batches WHERE id = ? AND user_id = ?").bind(batchId, user.id).first<any>();
   if (!batch) return notFound("Batch");
   if (batch.status !== "active") return conflict("Only active batches can log activities");
 
@@ -37,19 +38,19 @@ activities.post("/", async (c) => {
     readingId = crypto.randomUUID();
     await db
       .prepare(
-        `INSERT INTO readings (id, batch_id, device_id, gravity, temperature, battery, rssi, source_timestamp, created_at, source)
-         VALUES (?, ?, 'manual', ?, NULL, NULL, NULL, ?, ?, 'manual')`
+        `INSERT INTO readings (id, batch_id, device_id, gravity, temperature, battery, rssi, source_timestamp, created_at, source, user_id)
+         VALUES (?, ?, 'manual', ?, NULL, NULL, NULL, ?, ?, 'manual', ?)`
       )
-      .bind(readingId, batchId, parsed.data.details!.value, parsed.data.recorded_at, now)
+      .bind(readingId, batchId, parsed.data.details!.value, parsed.data.recorded_at, now, user.id)
       .run();
   }
 
   await db
     .prepare(
-      `INSERT INTO activities (id, batch_id, stage, type, title, details, recorded_at, created_at, updated_at, reading_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO activities (id, user_id, batch_id, stage, type, title, details, recorded_at, created_at, updated_at, reading_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(id, batchId, parsed.data.stage, parsed.data.type, parsed.data.title,
+    .bind(id, user.id, batchId, parsed.data.stage, parsed.data.type, parsed.data.title,
       detailsJson, parsed.data.recorded_at, now, now, readingId)
     .run();
 
@@ -61,7 +62,7 @@ activities.post("/", async (c) => {
 activities.get("/", async (c) => {
   const db = c.env.DB;
   const batchId = c.req.param("batchId");
-  const batch = await db.prepare("SELECT id FROM batches WHERE id = ?").bind(batchId).first();
+  const batch = await db.prepare("SELECT id FROM batches WHERE id = ? AND user_id = ?").bind(batchId, c.get("user").id).first();
   if (!batch) return notFound("Batch");
 
   let sql = "SELECT * FROM activities WHERE batch_id = ?";
@@ -90,8 +91,8 @@ activities.patch("/:activityId", async (c) => {
   const batchId = c.req.param("batchId");
   const activityId = c.req.param("activityId");
 
-  const row = await db.prepare("SELECT * FROM activities WHERE id = ? AND batch_id = ?")
-    .bind(activityId, batchId).first<any>();
+  const row = await db.prepare("SELECT * FROM activities WHERE id = ? AND batch_id = ? AND user_id = ?")
+    .bind(activityId, batchId, c.get("user").id).first<any>();
   if (!row) return notFound("Activity");
 
   const body = await c.req.json().catch(() => null);
@@ -138,8 +139,8 @@ activities.delete("/:activityId", async (c) => {
   const db = c.env.DB;
   const batchId = c.req.param("batchId");
   const activityId = c.req.param("activityId");
-  const row = await db.prepare("SELECT * FROM activities WHERE id = ? AND batch_id = ?")
-    .bind(activityId, batchId).first<any>();
+  const row = await db.prepare("SELECT * FROM activities WHERE id = ? AND batch_id = ? AND user_id = ?")
+    .bind(activityId, batchId, c.get("user").id).first<any>();
   if (!row) return notFound("Activity");
 
   // Delete the linked manual reading if present
