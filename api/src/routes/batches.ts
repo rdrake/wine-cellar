@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app";
-import { BatchCreateSchema, BatchUpdateSchema } from "../models";
+import { BatchCreateSchema, BatchUpdateSchema, StageSetSchema } from "../models";
 import { notFound, conflict, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
 import { WAYPOINT_ORDER } from "../schema";
@@ -155,21 +155,65 @@ batches.delete("/:batchId", async (c) => {
 
 // --- Lifecycle Endpoints ---
 
+batches.post("/:batchId/stage", async (c) => {
+  const db = c.env.DB;
+  const batchId = c.req.param("batchId");
+  const userId = c.get("user").id;
+  const row = await getOwnedBatch(db, batchId, userId);
+  if (!row) return notFound("Batch");
+  if (row.status !== "active") return conflict("Only active batches can change stage");
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = StageSetSchema.safeParse(body);
+  if (!parsed.success) return validationError(parsed.error.issues);
+
+  const newStage = parsed.data.stage;
+  const oldStage = row.stage as string;
+
+  // No-op if same stage
+  if (newStage === oldStage) {
+    return c.json(row);
+  }
+
+  const now = nowUtc();
+  await db.prepare("UPDATE batches SET stage = ?, updated_at = ? WHERE id = ? AND user_id = ?")
+    .bind(newStage, now, batchId, userId).run();
+
+  // Log activity
+  const activityId = crypto.randomUUID();
+  await db.prepare(
+    `INSERT INTO activities (id, batch_id, user_id, stage, type, title, details, recorded_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'note', ?, NULL, ?, ?, ?)`
+  ).bind(activityId, batchId, userId, newStage, `Stage changed from ${oldStage} to ${newStage}`, now, now, now).run();
+
+  return c.json(await getOwnedBatch(db, batchId, userId));
+});
+
 batches.post("/:batchId/advance", async (c) => {
   const db = c.env.DB;
   const batchId = c.req.param("batchId");
-  const row = await getOwnedBatch(db, batchId, c.get("user").id);
+  const userId = c.get("user").id;
+  const row = await getOwnedBatch(db, batchId, userId);
   if (!row) return notFound("Batch");
   if (row.status !== "active") return conflict("Only active batches can advance");
 
   const currentIdx = WAYPOINT_ORDER.indexOf(row.stage);
   if (currentIdx >= WAYPOINT_ORDER.length - 1) return conflict("Batch is at final stage");
 
+  const oldStage = row.stage as string;
   const nextStage = WAYPOINT_ORDER[currentIdx + 1];
   const now = nowUtc();
   await db.prepare("UPDATE batches SET stage = ?, updated_at = ? WHERE id = ? AND user_id = ?")
-    .bind(nextStage, now, batchId, c.get("user").id).run();
-  return c.json(await getOwnedBatch(db, batchId, c.get("user").id));
+    .bind(nextStage, now, batchId, userId).run();
+
+  // Log activity
+  const activityId = crypto.randomUUID();
+  await db.prepare(
+    `INSERT INTO activities (id, batch_id, user_id, stage, type, title, details, recorded_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'note', ?, NULL, ?, ?, ?)`
+  ).bind(activityId, batchId, userId, nextStage, `Stage changed from ${oldStage} to ${nextStage}`, now, now, now).run();
+
+  return c.json(await getOwnedBatch(db, batchId, userId));
 });
 
 async function unassignDevices(db: D1Database, batchId: string, now: string) {

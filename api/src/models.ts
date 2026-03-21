@@ -4,6 +4,7 @@ import {
   SOURCE_MATERIALS,
   BATCH_STATUSES,
   ALL_STAGES,
+  BATCH_STAGES,
   ACTIVITY_TYPES,
 } from "./schema";
 
@@ -44,6 +45,10 @@ export const ActivityUpdateSchema = z.object({
   recorded_at: z.string().optional(),
 });
 export type ActivityUpdate = z.infer<typeof ActivityUpdateSchema>;
+
+export const StageSetSchema = z.object({
+  stage: z.enum(BATCH_STAGES),
+});
 
 export const DeviceCreateSchema = z.object({
   id: z.string().min(1),

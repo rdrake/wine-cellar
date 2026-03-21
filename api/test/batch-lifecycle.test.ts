@@ -135,6 +135,66 @@ describe("batch lifecycle", () => {
     expect(status).toBe(409);
   });
 
+  it("sets stage to any waypoint", async () => {
+    const batchId = await createBatch();
+    const { status, json } = await fetchJson(`/api/v1/batches/${batchId}/stage`, {
+      method: "POST", headers: API_HEADERS, body: { stage: "stabilization" },
+    });
+    expect(status).toBe(200);
+    expect(json.stage).toBe("stabilization");
+  });
+
+  it("moves stage backward", async () => {
+    const batchId = await createBatch();
+    await fetchJson(`/api/v1/batches/${batchId}/stage`, {
+      method: "POST", headers: API_HEADERS, body: { stage: "secondary_fermentation" },
+    });
+    const { status, json } = await fetchJson(`/api/v1/batches/${batchId}/stage`, {
+      method: "POST", headers: API_HEADERS, body: { stage: "must_prep" },
+    });
+    expect(status).toBe(200);
+    expect(json.stage).toBe("must_prep");
+  });
+
+  it("stage change logs activity", async () => {
+    const batchId = await createBatch();
+    await fetchJson(`/api/v1/batches/${batchId}/stage`, {
+      method: "POST", headers: API_HEADERS, body: { stage: "primary_fermentation" },
+    });
+    const { json: activities } = await fetchJson(`/api/v1/batches/${batchId}/activities`, { headers: API_HEADERS });
+    expect(activities.items.length).toBe(1);
+    expect(activities.items[0].title).toContain("must_prep");
+    expect(activities.items[0].title).toContain("primary_fermentation");
+  });
+
+  it("rejects invalid stage name", async () => {
+    const batchId = await createBatch();
+    const { status } = await fetchJson(`/api/v1/batches/${batchId}/stage`, {
+      method: "POST", headers: API_HEADERS, body: { stage: "invalid_stage" },
+    });
+    expect(status).toBe(422);
+  });
+
+  it("rejects stage change on non-active batch", async () => {
+    const batchId = await createBatch();
+    await fetchJson(`/api/v1/batches/${batchId}/complete`, { method: "POST", headers: API_HEADERS });
+    const { status } = await fetchJson(`/api/v1/batches/${batchId}/stage`, {
+      method: "POST", headers: API_HEADERS, body: { stage: "bottling" },
+    });
+    expect(status).toBe(409);
+  });
+
+  it("no-ops when setting same stage", async () => {
+    const batchId = await createBatch();
+    const { status, json } = await fetchJson(`/api/v1/batches/${batchId}/stage`, {
+      method: "POST", headers: API_HEADERS, body: { stage: "must_prep" },
+    });
+    expect(status).toBe(200);
+    expect(json.stage).toBe("must_prep");
+    const { json: activities } = await fetchJson(`/api/v1/batches/${batchId}/activities`, { headers: API_HEADERS });
+    expect(activities.items.length).toBe(0);
+  });
+
   it("complete unassigns device", async () => {
     const batchId = await createBatch();
     await env.DB.prepare(
