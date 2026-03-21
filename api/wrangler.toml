@@ -6,6 +6,9 @@ compatibility_date = "2025-11-02"
 [placement]
 mode = "smart"
 
+[vars]
+CF_ACCESS_TEAM = "wine-cellar"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "wine-cellar-api"
