@@ -1,7 +1,7 @@
 import type {
   Batch, BatchCreate, BatchUpdate, BatchStatus, BatchStage, WineType,
   Activity, ActivityCreate, ActivityUpdate, ActivityType, AllStage,
-  Reading, Device, Alert,
+  Reading, Device,
   ListResponse, PaginatedResponse, DashboardResponse,
 } from "./types";
 
