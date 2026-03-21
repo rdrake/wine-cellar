@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
-import { applyMigrations, fetchJson, API_HEADERS, WEBHOOK_HEADERS } from "./helpers";
+import { applyMigrations, fetchJson, createBatch, API_HEADERS, WEBHOOK_HEADERS } from "./helpers";
 
 const VALID_PAYLOAD = {
   device_id: "pill-abc-123",
@@ -85,5 +85,24 @@ describe("webhook", () => {
       method: "POST", body: { bad: "data" },
     });
     expect(status).toBe(401);
+  });
+
+  it("fires temp_high alert on hot reading", async () => {
+    const batchId = await createBatch();
+    const { json: me } = await fetchJson("/api/v1/me", { headers: API_HEADERS });
+    await env.DB.prepare("INSERT INTO devices (id, name, user_id, batch_id, assigned_at, created_at, updated_at) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))")
+      .bind("hot-pill", "Hot Pill", me.id, batchId).run();
+
+    await fetchJson("/webhook/rapt", {
+      method: "POST",
+      headers: WEBHOOK_HEADERS,
+      body: { ...VALID_PAYLOAD, device_id: "hot-pill", temperature: 32.0 },
+    });
+
+    const alert = await env.DB.prepare(
+      "SELECT * FROM alert_state WHERE batch_id = ? AND alert_type = 'temp_high'"
+    ).bind(batchId).first<any>();
+    expect(alert).not.toBeNull();
+    expect(alert.alert_type).toBe("temp_high");
   });
 });

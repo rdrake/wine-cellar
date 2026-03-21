@@ -4,6 +4,8 @@ import { RaptWebhookSchema } from "../models";
 import { unauthorized, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
 import { timingSafeEqual } from "../lib/crypto";
+import { evaluateAlerts, type BatchAlertContext } from "../lib/alerts";
+import { processAlerts, resolveCleared } from "../lib/alert-manager";
 
 const webhook = new Hono<{ Bindings: Bindings }>();
 
@@ -55,6 +57,31 @@ webhook.post("/rapt", async (c) => {
       return c.json({ status: "duplicate", message: "Reading already exists" });
     }
     throw e;
+  }
+
+  // Evaluate alerts if device has a batch and user
+  if (batchId && userId) {
+    const recentReadings = await db.prepare(
+      "SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? ORDER BY source_timestamp ASC LIMIT 200"
+    ).bind(batchId).all<any>();
+
+    const batch = await db.prepare("SELECT stage, target_gravity FROM batches WHERE id = ? AND status = 'active'")
+      .bind(batchId).first<any>();
+
+    if (batch) {
+      const ctx: BatchAlertContext = {
+        batchId,
+        userId,
+        stage: batch.stage,
+        targetGravity: batch.target_gravity,
+        hasAssignedDevice: true,
+        readings: recentReadings.results,
+      };
+
+      const candidates = evaluateAlerts(ctx);
+      await processAlerts(db, userId, batchId, candidates);
+      await resolveCleared(db, userId, batchId, candidates);
+    }
   }
 
   return c.json({ status: "ok", reading_id: readingId });
