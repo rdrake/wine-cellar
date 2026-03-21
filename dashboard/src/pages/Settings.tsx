@@ -276,9 +276,14 @@ function NotificationsSection() {
           return;
         }
         const { key } = await api.push.vapidKey();
+        // Decode base64url to Uint8Array for applicationServerKey
+        const raw = key.replace(/-/g, "+").replace(/_/g, "/");
+        const pad = raw.length % 4 === 0 ? "" : "=".repeat(4 - (raw.length % 4));
+        const binary = atob(raw + pad);
+        const keyBytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
         const sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: key,
+          applicationServerKey: keyBytes,
         });
         const json = sub.toJSON();
         await api.push.subscribe({
