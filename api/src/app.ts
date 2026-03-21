@@ -25,6 +25,12 @@ const app = new Hono<AppEnv>();
 app.use("*", accessAuth);
 
 app.get("/health", (c) => c.json({ status: "ok" }));
+
+app.get("/api/v1/me", (c) => {
+  const user = c.get("user");
+  return c.json({ id: user.id, email: user.email, name: user.name });
+});
+
 app.route("/api/v1/batches", batches);
 app.route("/api/v1/batches/:batchId/activities", activities);
 app.route("/api/v1/devices", devices);
