@@ -4,8 +4,8 @@ import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
 import { GravitySparkline, TemperatureSparkline } from "@/components/Sparkline";
 import { STAGE_LABELS, WINE_TYPE_LABELS, ACTIVITY_TYPE_LABELS } from "@/types";
-import type { BatchSummary, Activity } from "@/types";
-import { attenuation, detectStall } from "@/lib/fermentation";
+import type { Alert, BatchSummary, Activity } from "@/types";
+import { attenuation } from "@/lib/fermentation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -33,54 +33,29 @@ function relativeTime(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function hoursAgo(isoDate: string): number {
-  return (Date.now() - new Date(isoDate).getTime()) / 3600000;
-}
-
-interface Alert {
-  batchId: string;
-  batchName: string;
-  type: "stall" | "no_readings" | "temp_high" | "temp_low";
-  message: string;
-}
-
-function deriveAlerts(batches: BatchSummary[]): Alert[] {
-  const alerts: Alert[] = [];
-  for (const b of batches) {
-    // Stall detection
-    const pseudoReadings = b.sparkline.map((p) => ({
-      gravity: p.g,
-      source_timestamp: p.t,
-    }));
-    const stallReason = detectStall(pseudoReadings);
-    if (stallReason) {
-      alerts.push({ batchId: b.id, batchName: b.name, type: "stall", message: stallReason });
-    }
-
-    // No recent readings (>48h with a device presumably assigned)
-    if (b.latest_reading && hoursAgo(b.latest_reading.source_timestamp) > 48) {
-      const ago = relativeTime(b.latest_reading.source_timestamp);
-      alerts.push({ batchId: b.id, batchName: b.name, type: "no_readings", message: `Last reading ${ago}` });
-    }
-
-    // Temperature warnings
-    if (b.latest_reading?.temperature != null) {
-      const t = b.latest_reading.temperature;
-      if (t >= 30) {
-        alerts.push({ batchId: b.id, batchName: b.name, type: "temp_high", message: `${t.toFixed(1)}\u00B0C — high temperature` });
-      } else if (t <= 8) {
-        alerts.push({ batchId: b.id, batchName: b.name, type: "temp_low", message: `${t.toFixed(1)}\u00B0C — low temperature` });
-      }
-    }
+function alertMessage(alert: Alert): string {
+  if (alert.context) {
+    try {
+      const ctx = JSON.parse(alert.context);
+      if (ctx.message) return ctx.message;
+    } catch { /* ignore */ }
   }
-  return alerts;
+  const labels: Record<string, string> = {
+    stall: "Fermentation may have stalled",
+    no_readings: "No recent readings",
+    temp_high: "High temperature",
+    temp_low: "Low temperature",
+    stage_suggestion: "Stage change suggested",
+  };
+  return labels[alert.alert_type] ?? "Needs attention";
 }
 
-const ALERT_STYLES: Record<Alert["type"], string> = {
+const ALERT_STYLES: Record<string, string> = {
   stall: "text-destructive",
   no_readings: "text-yellow-600 dark:text-yellow-400",
   temp_high: "text-destructive",
   temp_low: "text-blue-600 dark:text-blue-400",
+  stage_suggestion: "text-blue-600 dark:text-blue-400",
 };
 
 // ── Summary Stats ────────────────────────────────────────────────────
@@ -104,7 +79,7 @@ function SummaryStats({ batches }: { batches: BatchSummary[] }) {
 
 // ── Alerts Section ───────────────────────────────────────────────────
 
-function AlertsSection({ alerts }: { alerts: Alert[] }) {
+function AlertsSection({ alerts, onDismiss }: { alerts: Alert[]; onDismiss: (id: string) => void }) {
   if (alerts.length === 0) return null;
 
   return (
@@ -113,17 +88,29 @@ function AlertsSection({ alerts }: { alerts: Alert[] }) {
         Needs attention
       </h2>
       <div className="space-y-0.5">
-        {alerts.map((a, i) => (
-          <Link
-            key={`${a.batchId}-${a.type}-${i}`}
-            to={`/batches/${a.batchId}`}
-            className="flex items-baseline gap-1.5 py-1.5 -mx-4 px-4 active:bg-accent/50 transition-colors"
+        {alerts.map((a) => (
+          <div
+            key={a.id}
+            className="flex items-baseline gap-1.5 py-1.5 -mx-4 px-4"
           >
-            <span className={cn("text-sm font-medium", ALERT_STYLES[a.type])}>
-              {a.batchName}
-            </span>
-            <span className="text-sm text-muted-foreground">{a.message}</span>
-          </Link>
+            <Link
+              to={`/batches/${a.batch_id}`}
+              className="flex items-baseline gap-1.5 min-w-0 flex-1 active:bg-accent/50 transition-colors"
+            >
+              <span className={cn("text-sm font-medium shrink-0", ALERT_STYLES[a.alert_type])}>
+                {a.batch_name}
+              </span>
+              <span className="text-sm text-muted-foreground truncate">{alertMessage(a)}</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => onDismiss(a.id)}
+              className="text-xs text-muted-foreground hover:text-foreground shrink-0 ml-1"
+              aria-label={`Dismiss alert for ${a.batch_name}`}
+            >
+              ✕
+            </button>
+          </div>
         ))}
       </div>
     </section>
@@ -235,16 +222,21 @@ function activityPreview(activity: Activity & { batch_name: string }): string | 
 // ── Main Dashboard ───────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { data, loading, error } = useFetch(() => api.dashboard(), []);
+  const { data, loading, error, refetch } = useFetch(() => api.dashboard(), []);
+
+  async function handleDismiss(alertId: string) {
+    await api.alerts.dismiss(alertId);
+    refetch();
+  }
 
   // Sort batches: stalled first, then by days fermenting descending
-  const { sortedBatches, alerts } = useMemo(() => {
-    if (!data) return { sortedBatches: [], alerts: [] };
-    const alerts = deriveAlerts(data.active_batches);
-    const stalledIds = new Set(alerts.filter((a) => a.type === "stall").map((a) => a.batchId));
-    const noReadingIds = new Set(alerts.filter((a) => a.type === "no_readings").map((a) => a.batchId));
+  const sortedBatches = useMemo(() => {
+    if (!data) return [];
+    const alerts = data.alerts;
+    const stalledIds = new Set(alerts.filter((a) => a.alert_type === "stall").map((a) => a.batch_id));
+    const noReadingIds = new Set(alerts.filter((a) => a.alert_type === "no_readings").map((a) => a.batch_id));
 
-    const sorted = [...data.active_batches]
+    return [...data.active_batches]
       .map((b) => ({ ...b, _stalled: stalledIds.has(b.id) }))
       .sort((a, b) => {
         // Stalled first
@@ -256,7 +248,6 @@ export default function Dashboard() {
         // Then by days fermenting descending
         return b.days_fermenting - a.days_fermenting;
       });
-    return { sortedBatches: sorted, alerts };
   }, [data]);
 
   return (
@@ -275,7 +266,7 @@ export default function Dashboard() {
           <SummaryStats batches={data.active_batches} />
 
           {/* Alerts */}
-          <AlertsSection alerts={alerts} />
+          <AlertsSection alerts={data.alerts} onDismiss={handleDismiss} />
 
           {/* Active Batches */}
           <section>
