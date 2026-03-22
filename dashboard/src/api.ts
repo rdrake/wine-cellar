@@ -137,6 +137,14 @@ export const api = {
       apiFetch<{ status: string }>("/api/v1/auth/register", { method: "POST", body: data }),
     logout: () =>
       apiFetch<{ status: string }>("/api/v1/auth/logout", { method: "POST" }),
+    apiKeys: {
+      list: () =>
+        apiFetch<{ items: Array<{ id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }> }>("/api/v1/auth/api-keys"),
+      create: (name: string) =>
+        apiFetch<{ id: string; name: string; prefix: string; key: string; createdAt: string }>("/api/v1/auth/api-keys", { method: "POST", body: { name } }),
+      revoke: (id: string) =>
+        apiFetch<void>(`/api/v1/auth/api-keys/${id}`, { method: "DELETE" }),
+    },
   },
   users: {
     me: () =>
