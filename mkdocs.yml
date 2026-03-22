@@ -1,0 +1,49 @@
+site_name: Wine Cellar
+site_description: Batch management and fermentation monitoring for winemakers
+site_url: https://docs.cellar.drake.zone/
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    logo: material/glass-wine
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - User Guide:
+      - Overview: user-guide/README.md
+      - Alerts: user-guide/alerts.md
+      - RAPT Pill Setup: user-guide/rapt-pill.md
+      - Recording What You Did: user-guide/logging.md
+      - Stages and Status: user-guide/batch-lifecycle.md
+      - Compare and Export: user-guide/compare-and-export.md
