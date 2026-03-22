@@ -14,14 +14,14 @@
     "@simplewebauthn/server": "^13.3.0",
     "arctic": "^3.7.0",
     "hono": "^4",
-    "zod": "^3"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.8",
+    "@cloudflare/vitest-pool-workers": "^0.13.3",
     "@cloudflare/workers-types": "^4",
     "@types/node": "^25.5.0",
     "typescript": "^5",
-    "vitest": "^3",
+    "vitest": "^4.1.0",
     "wrangler": "^4"
   }
 }

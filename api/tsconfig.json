@@ -5,7 +5,7 @@
     "moduleResolution": "bundler",
     "strict": true,
     "lib": ["ESNext"],
-    "types": ["@cloudflare/workers-types/2023-07-01", "@cloudflare/vitest-pool-workers", "node"],
+    "types": ["@cloudflare/workers-types/2023-07-01", "node"],
     "noEmit": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
