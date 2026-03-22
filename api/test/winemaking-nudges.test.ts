@@ -116,6 +116,36 @@ describe("winemaking nudges", () => {
       );
       expect(findNudge(nudges, "temp-high-primary")).toBeNull();
     });
+
+    it("warns for white wine at 20°C", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "white", latestTemp: 20 })
+      );
+      const nudge = findNudge(nudges, "temp-high-primary");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.message).toContain("20");
+    });
+
+    it("does not warn for white wine at 17°C", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "white", latestTemp: 17 })
+      );
+      expect(findNudge(nudges, "temp-high-primary")).toBeNull();
+    });
+
+    it("warns for rosé at 20°C", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "rosé", latestTemp: 20 })
+      );
+      expect(findNudge(nudges, "temp-high-primary")).not.toBeNull();
+    });
+
+    it("does not warn for red wine at 20°C", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "red", latestTemp: 20 })
+      );
+      expect(findNudge(nudges, "temp-high-primary")).toBeNull();
+    });
   });
 
   describe("consider-pressing", () => {

@@ -66,12 +66,19 @@ function punchDown(ctx: NudgeContext): Nudge | null {
 
 function tempHighPrimary(ctx: NudgeContext): Nudge | null {
   if (ctx.stage !== "primary_fermentation") return null;
-  if (ctx.latestTemp == null || ctx.latestTemp < 29) return null;
+  if (ctx.latestTemp == null) return null;
+
+  const threshold = (ctx.wineType === "white" || ctx.wineType === "ros\u00e9") ? 20 : 29;
+  if (ctx.latestTemp < threshold) return null;
+
+  const guidance = threshold < 29
+    ? `stay under ${threshold}\u00b0C to preserve aromatics`
+    : `stay under ${threshold}\u00b0C`;
 
   return {
     id: "temp-high-primary",
     priority: "warning",
-    message: `Temperature is ${ctx.latestTemp}\u00b0C \u2014 stay under 29\u00b0C`,
+    message: `Temperature is ${ctx.latestTemp}\u00b0C \u2014 ${guidance}`,
     stage: ctx.stage,
   };
 }
