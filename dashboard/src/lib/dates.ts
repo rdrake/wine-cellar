@@ -11,12 +11,7 @@ function parseUtc(dateStr: string): Date {
   return parseISO(dateStr + "T00:00:00Z");
 }
 
-/** "3 days ago", "about 2 months ago", etc. */
+/** "3 days ago", "in 6 days", etc. — direction is automatic based on date vs now. */
 export function timeAgo(dateStr: string): string {
-  return formatDistanceToNow(parseUtc(dateStr), { addSuffix: true });
-}
-
-/** "in 6 days", "in about 2 months", etc. */
-export function timeUntil(dateStr: string): string {
   return formatDistanceToNow(parseUtc(dateStr), { addSuffix: true });
 }

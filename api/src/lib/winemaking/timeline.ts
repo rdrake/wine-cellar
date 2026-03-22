@@ -57,7 +57,7 @@ const PHASE_LABELS: Record<string, string> = {
   must_prep: "Must Preparation",
   primary_fermentation: "Primary Fermentation",
   secondary_fermentation: "Secondary Fermentation",
-  stabilization: "Stabilization & Aging",
+  stabilization: "Stabilization & Degassing",
   bottling: "Bottling",
 };
 

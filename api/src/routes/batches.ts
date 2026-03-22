@@ -108,10 +108,11 @@ batches.get("/:batchId", async (c) => {
   }
 
   // Gather context data for nudges and timeline
-  const [activityCtx, recentReadings] = await Promise.all([
+  const [activityCtx, recentReadings, stageEnteredAt] = await Promise.all([
     fetchWinemakingActivityContext(db, batchId, userId),
     db.prepare("SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? ORDER BY source_timestamp DESC LIMIT 10")
       .bind(batchId).all<any>(),
+    fetchStageEnteredAt(db, batchId, userId, row.stage),
   ]);
 
   const readings = recentReadings.results;
@@ -145,8 +146,6 @@ batches.get("/:batchId", async (c) => {
     lastRackingAt: activityCtx.lastRackingAt,
     mlfInoculatedAt: activityCtx.mlfInoculatedAt,
   });
-
-  const stageEnteredAt = await fetchStageEnteredAt(db, batchId, userId, row.stage);
 
   const currentPhase = computeCurrentPhase({
     stage: row.stage,

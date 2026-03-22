@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { timeUntil } from "@/lib/dates";
+import { timeAgo } from "@/lib/dates";
 import type { Milestone, CurrentPhase } from "@/types";
 
 function formatDate(iso: string): string {
@@ -68,7 +68,7 @@ export default function BatchTimeline({ milestones, currentPhase }: { milestones
                   <p className="text-xs text-muted-foreground">
                     {m.completed
                       ? formatDate(m.estimated_date)
-                      : timeUntil(m.estimated_date + "T00:00:00Z")}
+                      : timeAgo(m.estimated_date + "T00:00:00Z")}
                   </p>
                 </div>
               </div>
