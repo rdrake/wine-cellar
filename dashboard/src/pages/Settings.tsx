@@ -607,6 +607,7 @@ function PasskeysSection() {
           <input
             className="w-full px-3 py-2 text-sm border rounded bg-background"
             placeholder="e.g. MacBook Pro"
+            maxLength={100}
             value={newPasskeyName}
             onChange={(e) => setNewPasskeyName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleRegister(); }}
