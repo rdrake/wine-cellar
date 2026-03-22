@@ -55,6 +55,52 @@ describe("session auth", () => {
   });
 });
 
+describe("API key auth", () => {
+  it("authenticates with valid Bearer token", async () => {
+    const { userId } = await seedSession();
+    const { createApiKey } = await import("../src/lib/api-keys");
+    const { key } = await createApiKey(env.DB, userId, "Test");
+    const { status, json } = await fetchJson("/api/v1/batches", {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    expect(status).toBe(200);
+    expect(json.items).toBeDefined();
+  });
+
+  it("returns 401 for invalid Bearer token", async () => {
+    const { status } = await fetchJson("/api/v1/batches", {
+      headers: { Authorization: "Bearer wc-0000000000000000000000000000000000000000000000000000000000000000" },
+    });
+    expect(status).toBe(401);
+  });
+
+  it("returns 401 for non-wc Bearer token", async () => {
+    const { status } = await fetchJson("/api/v1/batches", {
+      headers: { Authorization: "Bearer some-random-token" },
+    });
+    expect(status).toBe(401);
+  });
+
+  it("prefers session cookie over Bearer when both present", async () => {
+    const headers = await authHeaders();
+    // Add an invalid Bearer — should still work via cookie
+    headers["Authorization"] = "Bearer wc-invalid";
+    const { status } = await fetchJson("/api/v1/batches", { headers });
+    expect(status).toBe(200);
+  });
+
+  it("falls back to Bearer when no session cookie present", async () => {
+    const { userId } = await seedSession();
+    const { createApiKey } = await import("../src/lib/api-keys");
+    const { key } = await createApiKey(env.DB, userId, "Fallback");
+    // No cookie, just Bearer
+    const { status } = await fetchJson("/api/v1/batches", {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    expect(status).toBe(200);
+  });
+});
+
 describe("GET /api/v1/auth/status", () => {
   it("returns authenticated=false when no session", async () => {
     const { status, json } = await fetchJson("/api/v1/auth/status");
