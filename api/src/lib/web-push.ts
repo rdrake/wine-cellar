@@ -138,7 +138,9 @@ async function encrypt(
   )) as CryptoKeyPair;
 
   // Export server public key (raw 65 bytes)
-  const serverPubRaw = new Uint8Array(await crypto.subtle.exportKey("raw", serverKeyPair.publicKey));
+  const serverPubRaw = new Uint8Array(
+    (await crypto.subtle.exportKey("raw", serverKeyPair.publicKey)) as ArrayBuffer,
+  );
 
   // Import subscriber's public key
   const subscriberKey = await crypto.subtle.importKey(
@@ -149,10 +151,10 @@ async function encrypt(
     [],
   );
 
-  // ECDH shared secret
+  // ECDH shared secret — Workers types use $public instead of public
   const sharedSecret = new Uint8Array(
     await crypto.subtle.deriveBits(
-      { name: "ECDH", public: subscriberKey },
+      { name: "ECDH", $public: subscriberKey },
       serverKeyPair.privateKey,
       256,
     ),

@@ -26,7 +26,6 @@ jobs:
   api-lint:
     name: API typecheck
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: api
