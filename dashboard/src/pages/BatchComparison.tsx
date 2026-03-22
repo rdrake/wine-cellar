@@ -208,7 +208,9 @@ export default function BatchComparison() {
           const batch = batchById.get(id);
           const readings = readingsMap.get(id);
           if (!batch || !readings) return null;
-          return { ...batchStats(batch, readings), color: COLORS[i] };
+          const stats = batchStats(batch, readings);
+          if (!stats) return null;
+          return { ...stats, color: COLORS[i] };
         }).filter(Boolean) as (NonNullable<ReturnType<typeof batchStats>> & { color: string })[];
         if (allStats.length === 0) return null;
         return (
