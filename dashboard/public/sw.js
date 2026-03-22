@@ -1,14 +1,12 @@
-const CACHE_NAME = "wine-cellar-v5";
-const STATIC_ASSETS = ["/", "/index.html"];
+const CACHE_NAME = "wine-cellar-v6";
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
+  // Skip waiting so new SW activates immediately
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
+  // Clear all old caches
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
@@ -19,40 +17,20 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  const url = new URL(request.url);
 
-  // API calls: network first, no cache fallback
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/webhook")) {
-    event.respondWith(fetch(request));
-    return;
-  }
+  // Only handle navigation requests (for offline support).
+  // Vite hashes all JS/CSS assets, so the browser cache handles those
+  // without the SW needing to intervene.
+  if (request.mode !== "navigate") return;
 
-  // Navigation requests (HTML): network first so deploys are immediate
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  // Static assets (hashed JS/CSS/fonts): cache first, then network
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const fetched = fetch(request).then((response) => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        }
+    fetch(request)
+      .then((response) => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         return response;
-      });
-      return cached || fetched;
-    })
+      })
+      .catch(() => caches.match(request))
   );
 });
 
@@ -96,7 +74,6 @@ self.addEventListener("notificationclick", (event) => {
   }
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      // If an existing window is open, navigate it
       for (const client of clientList) {
         if ("focus" in client) {
           client.focus();
@@ -104,7 +81,6 @@ self.addEventListener("notificationclick", (event) => {
           return;
         }
       }
-      // Otherwise open a new window
       return clients.openWindow(url);
     })
   );
