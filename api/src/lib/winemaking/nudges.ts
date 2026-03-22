@@ -55,6 +55,7 @@ function initialMeasurements(ctx: NudgeContext): Nudge | null {
 function punchDown(ctx: NudgeContext): Nudge | null {
   if (ctx.stage !== "primary_fermentation") return null;
   if (ctx.wineType !== "red" && ctx.wineType !== "ros\u00e9") return null;
+  if (ctx.sourceMaterial !== "fresh_grapes") return null;
 
   return {
     id: "punch-down",
@@ -86,6 +87,7 @@ function tempHighPrimary(ctx: NudgeContext): Nudge | null {
 function considerPressing(ctx: NudgeContext): Nudge | null {
   if (ctx.stage !== "primary_fermentation") return null;
   if (ctx.wineType !== "red") return null;
+  if (ctx.sourceMaterial !== "fresh_grapes") return null;
   if (ctx.latestGravity == null || ctx.latestGravity > 1.02) return null;
 
   return {
@@ -100,6 +102,7 @@ function considerPressing(ctx: NudgeContext): Nudge | null {
 function considerPressingRose(ctx: NudgeContext): Nudge | null {
   if (ctx.stage !== "primary_fermentation") return null;
   if (ctx.wineType !== "ros\u00e9") return null;
+  if (ctx.sourceMaterial !== "fresh_grapes") return null;
 
   return {
     id: "consider-pressing-rose",

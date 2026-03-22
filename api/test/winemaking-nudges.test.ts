@@ -90,6 +90,20 @@ describe("winemaking nudges", () => {
       );
       expect(findNudge(nudges, "punch-down")).toBeNull();
     });
+
+    it("does not show punch-down for kits", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "red", sourceMaterial: "kit" })
+      );
+      expect(findNudge(nudges, "punch-down")).toBeNull();
+    });
+
+    it("does not show punch-down for juice buckets", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "red", sourceMaterial: "juice_bucket" })
+      );
+      expect(findNudge(nudges, "punch-down")).toBeNull();
+    });
   });
 
   describe("temp-high-primary", () => {
@@ -173,6 +187,13 @@ describe("winemaking nudges", () => {
       expect(findNudge(nudges, "consider-pressing")).toBeNull();
     });
 
+    it("does not suggest pressing for kits", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "red", latestGravity: 1.015, sourceMaterial: "kit" })
+      );
+      expect(findNudge(nudges, "consider-pressing")).toBeNull();
+    });
+
     it("includes skin contact guidance in detail for red", () => {
       const nudges = generateNudges(
         makeContext({ stage: "primary_fermentation", wineType: "red", latestGravity: 1.015 })
@@ -205,6 +226,13 @@ describe("winemaking nudges", () => {
     it("does not show rosé pressing nudge outside primary fermentation", () => {
       const nudges = generateNudges(
         makeContext({ stage: "secondary_fermentation", wineType: "rosé" })
+      );
+      expect(findNudge(nudges, "consider-pressing-rose")).toBeNull();
+    });
+
+    it("does not show rosé pressing nudge for juice buckets", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "rosé", sourceMaterial: "juice_bucket" })
       );
       expect(findNudge(nudges, "consider-pressing-rose")).toBeNull();
     });
