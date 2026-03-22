@@ -148,7 +148,7 @@ export default function BatchForm({ initial, editMode, onSubmit, onCancel, submi
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Oak Type</Label>
-              <Select value={form.oak_type || undefined} onValueChange={(v) => set("oak_type", v)}>
+              <Select value={form.oak_type || undefined} onValueChange={(v) => set("oak_type", v ?? "")}>
                 <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(OAK_TYPE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
@@ -157,7 +157,7 @@ export default function BatchForm({ initial, editMode, onSubmit, onCancel, submi
             </div>
             <div className="space-y-2">
               <Label>Oak Format</Label>
-              <Select value={form.oak_format || undefined} onValueChange={(v) => set("oak_format", v)}>
+              <Select value={form.oak_format || undefined} onValueChange={(v) => set("oak_format", v ?? "")}>
                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(OAK_FORMAT_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
@@ -172,7 +172,7 @@ export default function BatchForm({ initial, editMode, onSubmit, onCancel, submi
             </div>
             <div className="space-y-2">
               <Label>MLF Status</Label>
-              <Select value={form.mlf_status || undefined} onValueChange={(v) => set("mlf_status", v)}>
+              <Select value={form.mlf_status || undefined} onValueChange={(v) => set("mlf_status", v ?? "")}>
                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(MLF_STATUS_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
