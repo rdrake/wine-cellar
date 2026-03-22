@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { WineType, SourceMaterial } from "@/types";
-import { WINE_TYPE_LABELS, SOURCE_MATERIAL_LABELS } from "@/types";
+import { WINE_TYPE_LABELS, SOURCE_MATERIAL_LABELS, OAK_TYPE_LABELS, OAK_FORMAT_LABELS, MLF_STATUS_LABELS } from "@/types";
 
 const WINE_TYPES = Object.entries(WINE_TYPE_LABELS) as [WineType, string][];
 const SOURCE_MATERIALS = Object.entries(SOURCE_MATERIAL_LABELS) as [SourceMaterial, string][];
@@ -18,6 +18,11 @@ export interface BatchFormData {
   volume_liters: string;
   target_volume_liters: string;
   notes: string;
+  yeast_strain: string;
+  oak_type: string;
+  oak_format: string;
+  oak_duration_days: string;
+  mlf_status: string;
 }
 
 interface Props {
@@ -38,6 +43,11 @@ export default function BatchForm({ initial, editMode, onSubmit, onCancel, submi
     volume_liters: initial?.volume_liters ?? "",
     target_volume_liters: initial?.target_volume_liters ?? "",
     notes: initial?.notes ?? "",
+    yeast_strain: initial?.yeast_strain ?? "",
+    oak_type: initial?.oak_type ?? "",
+    oak_format: initial?.oak_format ?? "",
+    oak_duration_days: initial?.oak_duration_days ?? "",
+    mlf_status: initial?.mlf_status ?? "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +137,51 @@ export default function BatchForm({ initial, editMode, onSubmit, onCancel, submi
           />
         </div>
       </div>
+
+      <details className="space-y-4">
+        <summary className="text-sm font-medium cursor-pointer">Winemaking Details (optional)</summary>
+        <div className="space-y-4 pt-2">
+          <div className="space-y-2">
+            <Label>Yeast Strain</Label>
+            <Input value={form.yeast_strain} onChange={(e) => set("yeast_strain", e.target.value)} placeholder="e.g. RC212, EC-1118, 71B" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Oak Type</Label>
+              <Select value={form.oak_type || undefined} onValueChange={(v) => set("oak_type", v)}>
+                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(OAK_TYPE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Oak Format</Label>
+              <Select value={form.oak_format || undefined} onValueChange={(v) => set("oak_format", v)}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(OAK_FORMAT_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Oak Duration (days)</Label>
+              <Input type="number" value={form.oak_duration_days} onChange={(e) => set("oak_duration_days", e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>MLF Status</Label>
+              <Select value={form.mlf_status || undefined} onValueChange={(v) => set("mlf_status", v)}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(MLF_STATUS_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      </details>
 
       <div className="space-y-2">
         <Label htmlFor="notes">Notes</Label>

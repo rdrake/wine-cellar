@@ -47,6 +47,11 @@ export default function BatchNew() {
       volume_liters: data.volume_liters ? parseFloat(data.volume_liters) : null,
       target_volume_liters: data.target_volume_liters ? parseFloat(data.target_volume_liters) : null,
       notes: data.notes || null,
+      yeast_strain: data.yeast_strain || null,
+      oak_type: data.oak_type || null,
+      oak_format: data.oak_format || null,
+      oak_duration_days: data.oak_duration_days ? parseInt(data.oak_duration_days) : null,
+      mlf_status: data.mlf_status || null,
     });
     navigate(`/batches/${batch.id}`);
   }

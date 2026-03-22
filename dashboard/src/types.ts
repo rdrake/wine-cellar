@@ -29,6 +29,12 @@ export interface Batch {
   volume_liters: number | null;
   target_volume_liters: number | null;
   target_gravity: number | null;
+  yeast_strain: string | null;
+  oak_type: string | null;
+  oak_format: string | null;
+  oak_duration_days: number | null;
+  mlf_status: string | null;
+  bottled_at: string | null;
   started_at: string;
   completed_at: string | null;
   notes: string | null;
@@ -105,7 +111,7 @@ export interface Alert {
   id: string;
   batch_id: string;
   batch_name: string;
-  alert_type: "stall" | "no_readings" | "temp_high" | "temp_low" | "stage_suggestion";
+  alert_type: string;
   context: string | null;
   fired_at: string;
 }
@@ -118,6 +124,11 @@ export interface BatchCreate {
   volume_liters?: number | null;
   target_volume_liters?: number | null;
   target_gravity?: number | null;
+  yeast_strain?: string | null;
+  oak_type?: string | null;
+  oak_format?: string | null;
+  oak_duration_days?: number | null;
+  mlf_status?: string | null;
   notes?: string | null;
 }
 
@@ -127,6 +138,11 @@ export interface BatchUpdate {
   volume_liters?: number | null;
   target_volume_liters?: number | null;
   target_gravity?: number | null;
+  yeast_strain?: string | null;
+  oak_type?: string | null;
+  oak_format?: string | null;
+  oak_duration_days?: number | null;
+  mlf_status?: string | null;
   status?: BatchStatus;
 }
 
@@ -200,4 +216,26 @@ export const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {
   tasting: "Tasting",
   note: "Note",
   adjustment: "Adjustment",
+};
+
+export const OAK_TYPE_LABELS: Record<string, string> = {
+  none: "None",
+  american: "American",
+  french: "French",
+  hungarian: "Hungarian",
+};
+
+export const OAK_FORMAT_LABELS: Record<string, string> = {
+  barrel: "Barrel",
+  chips: "Chips",
+  cubes: "Cubes",
+  staves: "Staves",
+  spiral: "Spiral",
+};
+
+export const MLF_STATUS_LABELS: Record<string, string> = {
+  not_planned: "Not Planned",
+  pending: "Pending",
+  in_progress: "In Progress",
+  complete: "Complete",
 };

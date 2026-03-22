@@ -19,6 +19,11 @@ export default function BatchEdit() {
       volume_liters: data.volume_liters ? parseFloat(data.volume_liters) : null,
       target_volume_liters: data.target_volume_liters ? parseFloat(data.target_volume_liters) : null,
       notes: data.notes || null,
+      yeast_strain: data.yeast_strain || null,
+      oak_type: data.oak_type || null,
+      oak_format: data.oak_format || null,
+      oak_duration_days: data.oak_duration_days ? parseInt(data.oak_duration_days) : null,
+      mlf_status: data.mlf_status || null,
     });
     navigate(`/batches/${id}`);
   }
@@ -40,6 +45,11 @@ export default function BatchEdit() {
           volume_liters: batch.volume_liters?.toString() ?? "",
           target_volume_liters: batch.target_volume_liters?.toString() ?? "",
           notes: batch.notes ?? "",
+          yeast_strain: batch.yeast_strain ?? "",
+          oak_type: batch.oak_type ?? "",
+          oak_format: batch.oak_format ?? "",
+          oak_duration_days: batch.oak_duration_days?.toString() ?? "",
+          mlf_status: batch.mlf_status ?? "",
         }}
         editMode
         onSubmit={handleSubmit}
