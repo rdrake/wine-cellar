@@ -290,6 +290,27 @@ describe("winemaking nudges", () => {
       expect(nudge!.priority).toBe("action");
       expect(nudge!.message).toContain("SG below 0.998");
       expect(nudge!.message).toContain("SO2");
+      expect(nudge!.message).toContain("pH");
+    });
+
+    it("includes red TA range for red wine", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "bottling", wineType: "red" })
+      );
+      const nudge = findNudge(nudges, "bottling-checklist");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.detail).toContain("0.60");
+      expect(nudge!.detail).toContain("0.80");
+    });
+
+    it("includes white TA range for white wine", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "bottling", wineType: "white" })
+      );
+      const nudge = findNudge(nudges, "bottling-checklist");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.detail).toContain("0.65");
+      expect(nudge!.detail).toContain("0.85");
     });
   });
 

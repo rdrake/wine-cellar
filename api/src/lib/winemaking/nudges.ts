@@ -146,11 +146,17 @@ function so2Racking(ctx: NudgeContext): Nudge | null {
 function bottlingChecklist(ctx: NudgeContext): Nudge | null {
   if (ctx.stage !== "bottling") return null;
 
+  const taRange =
+    ctx.wineType === "white" || ctx.wineType === "rosé"
+      ? "0.65–0.85"
+      : "0.60–0.80";
+
   return {
     id: "bottling-checklist",
     priority: "action",
     message:
-      "Final checks: SG below 0.998, free SO2 at 25\u201335 ppm, taste is clean",
+      "Final checks: SG below 0.998, free SO2 at 25–35 ppm, pH 3.2–3.6, taste is clean",
+    detail: `Target TA: ${taRange} g/100mL. pH above 3.6 increases spoilage risk.`,
     stage: ctx.stage,
   };
 }
