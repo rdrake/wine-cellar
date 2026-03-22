@@ -6,7 +6,7 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
-import type { AuthenticatorTransportFuture } from "@simplewebauthn/types";
+import type { AuthenticatorTransportFuture } from "@simplewebauthn/server";
 import { storeChallenge, consumeChallenge } from "../lib/auth-challenge";
 import {
   createSession,
@@ -335,7 +335,7 @@ auth.post("/register/options", async (c) => {
     rpName: "Wine Cellar",
     rpID: c.env.RP_ID,
     userName: user.email,
-    userID: webauthnUserId,
+    userID: new Uint8Array(webauthnUserId) as Uint8Array<ArrayBuffer>,
     attestationType: "none",
     authenticatorSelection: {
       residentKey: "required",
