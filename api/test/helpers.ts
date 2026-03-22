@@ -118,3 +118,69 @@ export async function createBatch(overrides: Record<string, unknown> = {}, email
   });
   return json.id as string;
 }
+
+/**
+ * Insert a user directly into the DB (for unit tests that don't go through the API).
+ * Returns the user ID.
+ *
+ * NOTE: email is required to avoid accidental collision with authHeaders()/seedSession()
+ * which default to TEST_USER_EMAIL.
+ */
+export async function seedUser(
+  opts: { id?: string; email: string },
+): Promise<string> {
+  const id = opts.id ?? crypto.randomUUID();
+  await env.DB.prepare(
+    "INSERT INTO users (id, email, name, created_at) VALUES (?, ?, ?, datetime('now'))",
+  ).bind(id, opts.email, opts.email.split("@")[0]).run();
+  return id;
+}
+
+/**
+ * Insert a device directly into the DB.
+ */
+export async function seedDevice(
+  id: string,
+  name: string,
+  opts: { userId?: string; batchId?: string; assignedAt?: string } = {},
+): Promise<void> {
+  const now = "2026-01-01T00:00:00Z";
+  await env.DB.prepare(
+    "INSERT INTO devices (id, name, user_id, batch_id, assigned_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ).bind(id, name, opts.userId ?? null, opts.batchId ?? null, opts.assignedAt ?? null, now, now).run();
+}
+
+interface SeedBatchOpts {
+  id?: string;
+  name?: string;
+  wine_type?: string;
+  source_material?: string;
+  stage?: string;
+  status?: string;
+  started_at?: string;
+}
+
+/**
+ * Insert a batch directly into the DB (for unit tests that don't need the full API flow).
+ * Returns the batch ID. Only accepts fields that are actually persisted.
+ */
+export async function seedBatchDirect(
+  userId: string,
+  overrides: SeedBatchOpts = {},
+): Promise<string> {
+  const id = overrides.id ?? crypto.randomUUID();
+  const b = {
+    name: "Test Batch",
+    wine_type: "red",
+    source_material: "kit",
+    stage: "primary_fermentation",
+    status: "active",
+    started_at: "2026-01-01T00:00:00Z",
+    ...overrides,
+  };
+  await env.DB.prepare(
+    `INSERT INTO batches (id, user_id, name, wine_type, source_material, stage, status, started_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+  ).bind(id, userId, b.name, b.wine_type, b.source_material, b.stage, b.status, b.started_at).run();
+  return id;
+}

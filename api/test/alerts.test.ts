@@ -1,9 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { evaluateAlerts, type BatchAlertContext } from "../src/lib/alerts";
 
+const NOW = new Date("2026-03-20T12:00:00Z");
+
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
+afterEach(() => { vi.useRealTimers(); });
+
 /** Helper: generate an ISO timestamp offset from "now" by the given hours. */
-function hoursAgo(hours: number, base = new Date("2026-03-20T12:00:00Z")): string {
-  return new Date(base.getTime() - hours * 3600_000).toISOString();
+function hoursAgo(hours: number): string {
+  return new Date(NOW.getTime() - hours * 3600_000).toISOString();
 }
 
 /** Build a minimal context, merging overrides. */

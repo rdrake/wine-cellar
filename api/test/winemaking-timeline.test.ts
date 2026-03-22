@@ -8,7 +8,7 @@ import {
   type CurrentPhaseContext,
 } from "../src/lib/winemaking/timeline";
 
-function baseContext(overrides: Partial<TimelineContext> = {}): TimelineContext {
+function makeContext(overrides: Partial<TimelineContext> = {}): TimelineContext {
   return {
     stage: "primary_fermentation",
     wineType: "red",
@@ -63,7 +63,7 @@ describe("isPastStage", () => {
 
 describe("projectTimeline", () => {
   it("projects end of primary from velocity (estimated confidence)", () => {
-    const ctx = baseContext({
+    const ctx = makeContext({
       velocityPerDay: -0.010,
       latestGravity: 1.05,
       targetGravity: 0.995,
@@ -83,7 +83,7 @@ describe("projectTimeline", () => {
   });
 
   it("uses typical duration when no velocity data (rough confidence)", () => {
-    const ctx = baseContext({
+    const ctx = makeContext({
       wineType: "white",
       sourceMaterial: "fresh_grapes",
     });
@@ -98,7 +98,7 @@ describe("projectTimeline", () => {
   });
 
   it("uses 7-day typical primary for reds", () => {
-    const ctx = baseContext({ wineType: "red" });
+    const ctx = makeContext({ wineType: "red" });
     const milestones = projectTimeline(ctx);
     const primary = milestones.find(
       (m) => m.label === "End of primary fermentation",
@@ -107,7 +107,7 @@ describe("projectTimeline", () => {
   });
 
   it("uses 7-day typical primary for kits", () => {
-    const ctx = baseContext({
+    const ctx = makeContext({
       wineType: "white",
       sourceMaterial: "kit",
     });
@@ -119,7 +119,7 @@ describe("projectTimeline", () => {
   });
 
   it("skips end-of-primary when past primary stage", () => {
-    const ctx = baseContext({ stage: "secondary_fermentation" });
+    const ctx = makeContext({ stage: "secondary_fermentation" });
     const milestones = projectTimeline(ctx);
     const primary = milestones.find(
       (m) => m.label === "End of primary fermentation",
@@ -128,7 +128,7 @@ describe("projectTimeline", () => {
   });
 
   it("projects racking schedule for reds (3 rackings)", () => {
-    const ctx = baseContext({ wineType: "red" });
+    const ctx = makeContext({ wineType: "red" });
     const milestones = projectTimeline(ctx);
     const rackings = milestones.filter((m) => m.label.includes("racking"));
     expect(rackings.length).toBeGreaterThanOrEqual(2);
@@ -139,7 +139,7 @@ describe("projectTimeline", () => {
   });
 
   it("projects MLF completion when in_progress", () => {
-    const ctx = baseContext({
+    const ctx = makeContext({
       mlfStatus: "in_progress",
       mlfInoculatedAt: "2026-01-10",
     });
@@ -152,14 +152,14 @@ describe("projectTimeline", () => {
   });
 
   it("skips MLF when not_planned", () => {
-    const ctx = baseContext({ mlfStatus: "not_planned" });
+    const ctx = makeContext({ mlfStatus: "not_planned" });
     const milestones = projectTimeline(ctx);
     const mlf = milestones.find((m) => m.label === "MLF completion");
     expect(mlf).toBeUndefined();
   });
 
   it("skips MLF when pending (not yet inoculated)", () => {
-    const ctx = baseContext({
+    const ctx = makeContext({
       mlfStatus: "pending",
       mlfInoculatedAt: null,
     });
@@ -169,7 +169,7 @@ describe("projectTimeline", () => {
   });
 
   it("marks completed rackings", () => {
-    const ctx = baseContext({
+    const ctx = makeContext({
       rackingCount: 2,
       lastRackingAt: "2026-02-15",
     });
@@ -181,7 +181,7 @@ describe("projectTimeline", () => {
   });
 
   it("uses lastRackingAt as anchor when rackings completed", () => {
-    const ctx = baseContext({
+    const ctx = makeContext({
       rackingCount: 1,
       lastRackingAt: "2026-02-01",
     });
@@ -192,7 +192,7 @@ describe("projectTimeline", () => {
   });
 
   it("projects earliest bottling for kit white", () => {
-    const ctx = baseContext({
+    const ctx = makeContext({
       wineType: "white",
       sourceMaterial: "kit",
     });
@@ -209,7 +209,7 @@ describe("projectTimeline", () => {
   });
 
   it("projects earliest bottling for red with 180-day aging", () => {
-    const ctx = baseContext({
+    const ctx = makeContext({
       wineType: "red",
       sourceMaterial: "fresh_grapes",
     });
@@ -224,7 +224,7 @@ describe("projectTimeline", () => {
   });
 
   it("projects earliest bottling for white with 90-day aging", () => {
-    const ctx = baseContext({
+    const ctx = makeContext({
       wineType: "white",
       sourceMaterial: "fresh_grapes",
     });
@@ -285,7 +285,7 @@ describe("computeCurrentPhase", () => {
       stageEnteredAt: "2026-01-01",
       now: "2026-03-22",
     });
-    expect(result.label).toBe("Stabilization & Aging");
+    expect(result.label).toBe("Stabilization & Degassing");
     expect(result.daysElapsed).toBe(80);
     expect(result.estimatedTotalDays).toBeNull();
   });

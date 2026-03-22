@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
-import { applyMigrations, fetchJson, createBatch, authHeaders, WEBHOOK_HEADERS } from "./helpers";
+import { applyMigrations, fetchJson, createBatch, authHeaders, seedDevice, TEST_USER_EMAIL, WEBHOOK_HEADERS } from "./helpers";
 
 const VALID_PAYLOAD = {
   device_id: "pill-abc-123",
@@ -18,8 +18,7 @@ beforeEach(async () => {
 
 describe("webhook", () => {
   it("creates reading", async () => {
-    await env.DB.prepare("INSERT INTO devices (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
-      .bind("pill-abc-123", "My Pill", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z").run();
+    await seedDevice("pill-abc-123", "My Pill");
     const { status } = await fetchJson("/webhook/rapt", { method: "POST", headers: WEBHOOK_HEADERS, body: VALID_PAYLOAD });
     expect(status).toBe(200);
     const reading = await env.DB.prepare("SELECT * FROM readings WHERE device_id = 'pill-abc-123'").first<any>();
@@ -37,17 +36,11 @@ describe("webhook", () => {
   });
 
   it("resolves batch from device", async () => {
-    const headers = await authHeaders();
-    const { json: batch } = await fetchJson("/api/v1/batches", {
-      method: "POST", headers,
-      body: { name: "Test", wine_type: "red", source_material: "kit", started_at: "2026-03-19T10:00:00Z" },
-    });
-    await env.DB.prepare(
-      "INSERT INTO devices (id, name, batch_id, assigned_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind("pill-abc-123", "My Pill", batch.id, "2026-03-19T10:00:00Z", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z").run();
+    const batchId = await createBatch({ name: "Test" });
+    await seedDevice("pill-abc-123", "My Pill", { batchId, assignedAt: "2026-03-19T10:00:00Z" });
     await fetchJson("/webhook/rapt", { method: "POST", headers: WEBHOOK_HEADERS, body: VALID_PAYLOAD });
     const reading = await env.DB.prepare("SELECT batch_id FROM readings WHERE device_id = 'pill-abc-123'").first<any>();
-    expect(reading.batch_id).toBe(batch.id);
+    expect(reading.batch_id).toBe(batchId);
   });
 
   it("unassigned device null batch", async () => {
@@ -90,9 +83,8 @@ describe("webhook", () => {
 
   it("fires temp_high alert on hot reading", async () => {
     const batchId = await createBatch();
-    const user = await env.DB.prepare("SELECT id FROM users WHERE email = 'test@example.com'").first<{ id: string }>();
-    await env.DB.prepare("INSERT INTO devices (id, name, user_id, batch_id, assigned_at, created_at, updated_at) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))")
-      .bind("hot-pill", "Hot Pill", user!.id, batchId).run();
+    const user = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(TEST_USER_EMAIL).first<{ id: string }>();
+    await seedDevice("hot-pill", "Hot Pill", { userId: user!.id, batchId, assignedAt: new Date().toISOString() });
 
     await fetchJson("/webhook/rapt", {
       method: "POST",

@@ -1,18 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, it, expect, beforeEach } from "vitest";
-import { applyMigrations, sessionHeaders } from "./helpers";
-import { createSession, hashToken } from "../src/lib/auth-session";
-
-async function seedUserWithSession(email: string = "test@example.com") {
-  const userId = crypto.randomUUID();
-  await env.DB.prepare(
-    "INSERT INTO users (id, email, created_at) VALUES (?, ?, datetime('now'))",
-  )
-    .bind(userId, email)
-    .run();
-  const { token } = await createSession(env.DB, userId);
-  return { userId, token };
-}
+import { applyMigrations, sessionHeaders, seedSession, hashToken } from "./helpers";
 
 describe("auth middleware", () => {
   beforeEach(async () => {
@@ -51,7 +39,7 @@ describe("auth middleware", () => {
   });
 
   it("authenticates via session cookie", async () => {
-    const { token } = await seedUserWithSession("test@example.com");
+    const { token } = await seedSession();
     const res = await SELF.fetch("https://localhost/api/v1/batches", {
       headers: sessionHeaders(token),
     });
@@ -59,7 +47,7 @@ describe("auth middleware", () => {
   });
 
   it("rejects expired sessions", async () => {
-    const { token } = await seedUserWithSession("test@example.com");
+    const { token } = await seedSession();
     const hash = await hashToken(token);
     await env.DB.prepare(
       "UPDATE auth_sessions SET expires_at = datetime('now', '-1 hour') WHERE id = ?",

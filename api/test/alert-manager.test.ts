@@ -1,19 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
-import { applyMigrations } from "./helpers";
+import { applyMigrations, seedUser, seedBatchDirect } from "./helpers";
 import { processAlerts, resolveCleared, getActiveAlerts } from "../src/lib/alert-manager";
 
-const USER_ID = "test-user-id";
-const BATCH_ID = "test-batch-id";
+let USER_ID: string;
+let BATCH_ID: string;
 
 beforeEach(async () => {
   await applyMigrations();
-  await env.DB.prepare("INSERT INTO users (id, email, created_at) VALUES (?, ?, datetime('now'))")
-    .bind(USER_ID, "test@example.com").run();
-  await env.DB.prepare(
-    `INSERT INTO batches (id, user_id, name, wine_type, source_material, stage, status, started_at, created_at, updated_at)
-     VALUES (?, ?, 'Test Batch', 'red', 'kit', 'primary_fermentation', 'active', datetime('now'), datetime('now'), datetime('now'))`
-  ).bind(BATCH_ID, USER_ID).run();
+  USER_ID = await seedUser({ email: "alert-mgr@test.com" });
+  BATCH_ID = await seedBatchDirect(USER_ID);
 });
 
 describe("alert-manager", () => {

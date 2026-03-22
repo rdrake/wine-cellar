@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
-import { applyMigrations, fetchJson, createBatch, authHeaders, TEST_USER_EMAIL } from "./helpers";
-
-/** Resolve the test user's ID (upserted by authHeaders on first request) */
-async function getTestUserId(): Promise<string> {
-  const row = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(TEST_USER_EMAIL).first<any>();
-  return row.id;
-}
+import { applyMigrations, fetchJson, createBatch, authHeaders, seedDevice, seedSession, TEST_USER_EMAIL } from "./helpers";
 
 async function insertReadings(batchId: string | null, deviceId: string, count: number, userId: string | null = null) {
   for (let i = 0; i < count; i++) {
@@ -25,7 +19,7 @@ beforeEach(async () => {
 describe("readings", () => {
   it("lists readings by batch", async () => {
     const batchId = await createBatch();
-    const userId = await getTestUserId();
+    const { userId } = await seedSession();
     await insertReadings(batchId, "pill-1", 5, userId);
     const { status, json } = await fetchJson(`/api/v1/batches/${batchId}/readings`, { headers: await authHeaders() });
     expect(status).toBe(200);
@@ -34,11 +28,9 @@ describe("readings", () => {
   });
 
   it("lists readings by device", async () => {
-    // createBatch triggers authHeaders which upserts the test user
     await createBatch();
-    const userId = await getTestUserId();
-    await env.DB.prepare("INSERT INTO devices (id, name, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
-      .bind("pill-1", "My Pill", userId, "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z").run();
+    const { userId } = await seedSession();
+    await seedDevice("pill-1", "My Pill", { userId });
     await insertReadings(null, "pill-1", 3, userId);
     const { status, json } = await fetchJson("/api/v1/devices/pill-1/readings", { headers: await authHeaders() });
     expect(status).toBe(200);
@@ -47,7 +39,7 @@ describe("readings", () => {
 
   it("paginates readings", async () => {
     const batchId = await createBatch();
-    const userId = await getTestUserId();
+    const { userId } = await seedSession();
     await insertReadings(batchId, "pill-1", 5, userId);
 
     const headers = await authHeaders();

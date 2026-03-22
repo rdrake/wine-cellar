@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
-import { applyMigrations } from "./helpers";
+import { applyMigrations, seedUser, seedBatchDirect, seedDevice } from "./helpers";
 import { evaluateAllBatches } from "../src/cron";
 
 beforeEach(async () => {
@@ -9,16 +9,9 @@ beforeEach(async () => {
 
 describe("cron evaluateAllBatches", () => {
   it("creates no_readings alert for batch with stale device", async () => {
-    const userId = "cron-user";
-    const batchId = "cron-batch";
-    await env.DB.prepare("INSERT INTO users (id, email, created_at) VALUES (?, 'cron@test.com', datetime('now'))").bind(userId).run();
-    await env.DB.prepare(
-      `INSERT INTO batches (id, user_id, name, wine_type, source_material, stage, status, started_at, created_at, updated_at)
-       VALUES (?, ?, 'Cron Batch', 'red', 'kit', 'primary_fermentation', 'active', datetime('now'), datetime('now'), datetime('now'))`
-    ).bind(batchId, userId).run();
-    await env.DB.prepare(
-      "INSERT INTO devices (id, name, user_id, batch_id, assigned_at, created_at, updated_at) VALUES ('cron-pill', 'Pill', ?, ?, datetime('now'), datetime('now'), datetime('now'))"
-    ).bind(userId, batchId).run();
+    const userId = await seedUser({ email: "cron@test.com" });
+    const batchId = await seedBatchDirect(userId);
+    await seedDevice("cron-pill", "Pill", { userId, batchId, assignedAt: new Date().toISOString() });
 
     const oldDate = new Date(Date.now() - 72 * 3600000).toISOString();
     await env.DB.prepare(
@@ -34,13 +27,8 @@ describe("cron evaluateAllBatches", () => {
   });
 
   it("skips inactive batches", async () => {
-    const userId = "cron-user-2";
-    const batchId = "cron-batch-2";
-    await env.DB.prepare("INSERT INTO users (id, email, created_at) VALUES (?, 'cron2@test.com', datetime('now'))").bind(userId).run();
-    await env.DB.prepare(
-      `INSERT INTO batches (id, user_id, name, wine_type, source_material, stage, status, started_at, created_at, updated_at)
-       VALUES (?, ?, 'Completed', 'red', 'kit', 'bottling', 'completed', datetime('now'), datetime('now'), datetime('now'))`
-    ).bind(batchId, userId).run();
+    const userId = await seedUser({ email: "cron2@test.com" });
+    const batchId = await seedBatchDirect(userId, { stage: "bottling", status: "completed" });
 
     await evaluateAllBatches(env.DB, "", "");
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
-import { applyMigrations, fetchJson, authHeaders, createBatch } from "./helpers";
+import { applyMigrations, fetchJson, createBatch, seedUser, seedSession, sessionHeaders } from "./helpers";
 
 beforeEach(async () => {
   await applyMigrations();
@@ -9,12 +9,12 @@ beforeEach(async () => {
 describe("alerts API", () => {
   it("dismiss marks alert as dismissed", async () => {
     const batchId = await createBatch();
-    const headers = await authHeaders();
-    const user = await env.DB.prepare("SELECT id FROM users WHERE email = 'test@example.com'").first<{ id: string }>();
+    const { token, userId } = await seedSession();
+    const headers = sessionHeaders(token);
     const alertId = crypto.randomUUID();
     await env.DB.prepare(
       "INSERT INTO alert_state (id, user_id, batch_id, alert_type, fired_at) VALUES (?, ?, ?, 'temp_high', datetime('now'))"
-    ).bind(alertId, user!.id, batchId).run();
+    ).bind(alertId, userId, batchId).run();
 
     const { status } = await fetchJson(`/api/v1/alerts/${alertId}/dismiss`, {
       method: "POST", headers,
@@ -28,25 +28,24 @@ describe("alerts API", () => {
   it("dismiss rejects other user's alert", async () => {
     const batchId = await createBatch();
     const alertId = crypto.randomUUID();
-    // Create a fake user for this alert
-    await env.DB.prepare("INSERT INTO users (id, email, created_at) VALUES ('other-user', 'other@test.com', datetime('now'))").run();
+    const otherUserId = await seedUser({ email: "other@test.com" });
     await env.DB.prepare(
-      "INSERT INTO alert_state (id, user_id, batch_id, alert_type, fired_at) VALUES (?, 'other-user', ?, 'temp_high', datetime('now'))"
-    ).bind(alertId, batchId).run();
+      "INSERT INTO alert_state (id, user_id, batch_id, alert_type, fired_at) VALUES (?, ?, ?, 'temp_high', datetime('now'))"
+    ).bind(alertId, otherUserId, batchId).run();
 
     const { status } = await fetchJson(`/api/v1/alerts/${alertId}/dismiss`, {
-      method: "POST", headers: await authHeaders(),
+      method: "POST", headers: sessionHeaders((await seedSession()).token),
     });
     expect(status).toBe(404);
   });
 
   it("dashboard includes active alerts", async () => {
     const batchId = await createBatch();
-    const headers = await authHeaders();
-    const user = await env.DB.prepare("SELECT id FROM users WHERE email = 'test@example.com'").first<{ id: string }>();
+    const { token, userId } = await seedSession();
+    const headers = sessionHeaders(token);
     await env.DB.prepare(
       "INSERT INTO alert_state (id, user_id, batch_id, alert_type, context, fired_at) VALUES (?, ?, ?, 'stall', '{\"gravity\":1.050}', datetime('now'))"
-    ).bind(crypto.randomUUID(), user!.id, batchId).run();
+    ).bind(crypto.randomUUID(), userId, batchId).run();
 
     const { json } = await fetchJson("/api/v1/dashboard", { headers });
     expect(json.alerts).toBeDefined();
