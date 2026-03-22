@@ -72,8 +72,11 @@ describe("projectTimeline", () => {
     );
     expect(primary).toBeDefined();
     expect(primary!.confidence).toBe("estimated");
-    // remaining = 1.050 - 0.995 = 0.055, velocity = 0.010/day → 6 days
-    expect(primary!.estimated_date).toBe("2026-01-07");
+    // remaining = 1.050 - 0.995 = 0.055, velocity = 0.010/day → 6 days from today
+    const today = new Date().toISOString().slice(0, 10);
+    const expectedDate = new Date(today + "T00:00:00Z");
+    expectedDate.setUTCDate(expectedDate.getUTCDate() + 6);
+    expect(primary!.estimated_date).toBe(expectedDate.toISOString().slice(0, 10));
     expect(primary!.basis).toContain("velocity");
   });
 

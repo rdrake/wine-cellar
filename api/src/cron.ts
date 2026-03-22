@@ -69,7 +69,7 @@ export async function evaluateAllBatches(
     });
 
     const estimatedRackingDates = milestones
-      .filter((m) => /racking/i.test(m.label) && !m.completed)
+      .filter((m) => /racking/i.test(m.label))
       .map((m) => m.estimated_date);
     const bottlingMilestone = milestones.find((m) => /bottling/i.test(m.label));
     const estimatedBottlingDate = bottlingMilestone?.estimated_date ?? null;

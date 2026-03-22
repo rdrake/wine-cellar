@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Nudge } from "@/types";
@@ -27,6 +27,12 @@ function dismiss(batchId: string, id: string) {
 
 export default function NudgeBar({ nudges, batchId }: { nudges: Nudge[]; batchId: string }) {
   const [dismissed, setDismissed] = useState(() => getDismissed(batchId));
+
+  // Reset dismissed state when navigating to a different batch
+  useEffect(() => {
+    setDismissed(getDismissed(batchId));
+  }, [batchId]);
+
   const visible = nudges.filter((n) => !dismissed.has(n.id));
   if (visible.length === 0) return null;
 

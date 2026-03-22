@@ -78,12 +78,12 @@ export function projectTimeline(ctx: TimelineContext): Milestone[] {
       ctx.latestGravity !== null &&
       ctx.targetGravity !== null
     ) {
-      // Extrapolate: remaining SG / |velocity| = days until target gravity.
-      // Anchored from startedAt since we don't have a separate "today" input.
+      // Extrapolate: remaining SG / |velocity| = days from now until target gravity.
       const remaining = ctx.latestGravity - ctx.targetGravity;
       const daysLeft = Math.ceil(remaining / Math.abs(ctx.velocityPerDay));
+      const today = new Date().toISOString().slice(0, 10);
 
-      estimatedPrimaryEnd = addDays(ctx.startedAt, daysLeft);
+      estimatedPrimaryEnd = addDays(today, daysLeft);
       milestones.push({
         label: "End of primary fermentation",
         estimated_date: estimatedPrimaryEnd,
