@@ -62,5 +62,11 @@ export function setSessionCookie(c: Context, token: string, secure: boolean): vo
 
 export function clearSessionCookie(c: Context, secure: boolean): void {
   const name = secure ? "__Host-session" : "session";
-  deleteCookie(c, name, { path: "/" });
+  setCookie(c, name, "", {
+    httpOnly: true,
+    secure,
+    sameSite: "Lax",
+    path: "/",
+    maxAge: 0,
+  });
 }
