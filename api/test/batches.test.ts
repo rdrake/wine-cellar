@@ -212,3 +212,31 @@ describe("winemaking metadata", () => {
     expect(completed.bottled_at).toBeNull();
   });
 });
+
+describe("winemaking intelligence on batch detail", () => {
+  it("returns nudges array on active batch", async () => {
+    const id = await createBatch();
+    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: API_HEADERS });
+    expect(json.nudges).toBeDefined();
+    expect(Array.isArray(json.nudges)).toBe(true);
+    expect(json.nudges.length).toBeGreaterThan(0);
+    // must_prep stage should have measurement nudge
+    const measure = json.nudges.find((n: any) => n.id.includes("initial-measurements"));
+    expect(measure).toBeTruthy();
+  });
+
+  it("returns timeline array on active batch", async () => {
+    const id = await createBatch();
+    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: API_HEADERS });
+    expect(json.timeline).toBeDefined();
+    expect(Array.isArray(json.timeline)).toBe(true);
+  });
+
+  it("does NOT return nudges/timeline on completed batch", async () => {
+    const id = await createBatch();
+    await fetchJson(`/api/v1/batches/${id}/complete`, { method: "POST", headers: API_HEADERS });
+    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: API_HEADERS });
+    expect(json.nudges).toEqual([]);
+    expect(json.timeline).toEqual([]);
+  });
+});
