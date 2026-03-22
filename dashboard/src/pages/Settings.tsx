@@ -21,7 +21,10 @@ import type { Device, Batch, Reading, Passkey } from "@/types";
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function relativeTime(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
+  // SQLite datetime('now') omits the Z suffix — append it if missing so
+  // the browser parses the timestamp as UTC rather than local time.
+  const normalized = isoDate.endsWith("Z") || isoDate.includes("+") ? isoDate : isoDate + "Z";
+  const diff = Date.now() - new Date(normalized).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
