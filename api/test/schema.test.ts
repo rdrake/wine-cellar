@@ -6,6 +6,9 @@ import {
   BATCH_STAGES,
   WAYPOINT_ALLOWED_STAGES,
   WAYPOINT_ORDER,
+  OAK_TYPES,
+  OAK_FORMATS,
+  MLF_STATUSES,
 } from "../src/schema";
 
 beforeEach(async () => {
@@ -39,5 +42,27 @@ describe("schema", () => {
 
   it("waypoint order matches batch stages", () => {
     expect([...WAYPOINT_ORDER]).toEqual([...BATCH_STAGES]);
+  });
+
+  it("exports OAK_TYPES", () => {
+    expect(OAK_TYPES).toContain("none");
+    expect(OAK_TYPES).toContain("french");
+    expect(OAK_TYPES).toContain("american");
+    expect(OAK_TYPES).toContain("hungarian");
+  });
+
+  it("exports OAK_FORMATS", () => {
+    expect(OAK_FORMATS).toContain("barrel");
+    expect(OAK_FORMATS).toContain("chips");
+    expect(OAK_FORMATS).toContain("cubes");
+    expect(OAK_FORMATS).toContain("staves");
+    expect(OAK_FORMATS).toContain("spiral");
+  });
+
+  it("exports MLF_STATUSES", () => {
+    expect(MLF_STATUSES).toContain("not_planned");
+    expect(MLF_STATUSES).toContain("pending");
+    expect(MLF_STATUSES).toContain("in_progress");
+    expect(MLF_STATUSES).toContain("complete");
   });
 });

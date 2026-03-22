@@ -28,6 +28,15 @@ export type BatchStatus = (typeof BATCH_STATUSES)[number];
 export const ACTIVITY_TYPES = ["addition", "racking", "measurement", "tasting", "note", "adjustment"] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 
+export const OAK_TYPES = ["none", "american", "french", "hungarian"] as const;
+export type OakType = (typeof OAK_TYPES)[number];
+
+export const OAK_FORMATS = ["barrel", "chips", "cubes", "staves", "spiral"] as const;
+export type OakFormat = (typeof OAK_FORMATS)[number];
+
+export const MLF_STATUSES = ["not_planned", "pending", "in_progress", "complete"] as const;
+export type MlfStatus = (typeof MLF_STATUSES)[number];
+
 export const WAYPOINT_ALLOWED_STAGES: Record<BatchStage, readonly AllStage[]> = {
   must_prep: ["receiving", "crushing", "must_prep"],
   primary_fermentation: ["primary_fermentation", "pressing"],
