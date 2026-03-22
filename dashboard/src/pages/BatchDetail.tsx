@@ -27,6 +27,7 @@ import DeviceSection from "@/components/DeviceSection";
 import ExportButton from "@/components/ExportButton";
 import NudgeBar from "@/components/NudgeBar";
 import BatchTimeline from "@/components/BatchTimeline";
+import CellaringCard from "@/components/CellaringCard";
 import { abv, attenuation, velocity, tempStats, daysSince, projectedDaysToTarget } from "@/lib/fermentation";
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -404,6 +405,9 @@ export default function BatchDetail() {
             loading={!readingsData && !error}
             error={null}
           />
+
+          {/* Cellaring card for bottled batches */}
+          {batch.cellaring && <CellaringCard cellaring={batch.cellaring} />}
 
           {/* Projected timeline for active batches */}
           {batch.status === "active" && batch.timeline && batch.timeline.length > 0 && (

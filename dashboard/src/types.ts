@@ -19,6 +19,15 @@ export type AllStage =
 
 export type ActivityType = "addition" | "racking" | "measurement" | "tasting" | "note" | "adjustment";
 
+export interface DrinkWindow {
+  readyDate: string;
+  peakStart: string;
+  peakEnd: string;
+  pastPeakDate: string;
+  storageNote: string;
+  adjustmentNote: string | null;
+}
+
 export interface Batch {
   id: string;
   name: string;
@@ -40,6 +49,7 @@ export interface Batch {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  cellaring?: DrinkWindow | null;
   nudges?: Nudge[];
   timeline?: Milestone[];
 }
