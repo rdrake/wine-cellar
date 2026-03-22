@@ -85,16 +85,33 @@ export default function DetailFields({ type, details, onChange }: {
       return (
         <>
           <div className="space-y-2">
+            <Label>Appearance</Label>
+            <Input value={details.appearance ?? ""} onChange={(e) => set("appearance", e.target.value)} placeholder="Clarity, color, viscosity" />
+          </div>
+          <div className="space-y-2">
             <Label>Aroma</Label>
-            <Input value={details.aroma ?? ""} onChange={(e) => set("aroma", e.target.value)} required />
+            <Input value={details.aroma ?? ""} onChange={(e) => set("aroma", e.target.value)} placeholder="Nose characteristics" />
+          </div>
+          <div className="space-y-2">
+            <Label>Palate</Label>
+            <Input value={details.palate ?? ""} onChange={(e) => set("palate", e.target.value)} placeholder="Taste, body, tannin, acidity" />
+          </div>
+          <div className="space-y-2">
+            <Label>Finish</Label>
+            <Input value={details.finish ?? ""} onChange={(e) => set("finish", e.target.value)} placeholder="Aftertaste length and character" />
           </div>
           <div className="space-y-2">
             <Label>Flavor</Label>
-            <Input value={details.flavor ?? ""} onChange={(e) => set("flavor", e.target.value)} required />
+            <Input value={details.flavor ?? ""} onChange={(e) => set("flavor", e.target.value)} placeholder="Overall flavor notes" />
           </div>
           <div className="space-y-2">
-            <Label>Appearance</Label>
-            <Input value={details.appearance ?? ""} onChange={(e) => set("appearance", e.target.value)} required />
+            <Label>Overall Score (1-5)</Label>
+            <Select value={details.overall_score ?? ""} onValueChange={(v) => v && set("overall_score", v)}>
+              <SelectTrigger><SelectValue placeholder="Rate" /></SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3, 4, 5].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
         </>
       );

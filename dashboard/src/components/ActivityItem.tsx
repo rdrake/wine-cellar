@@ -46,11 +46,17 @@ function formatDetails(type: ActivityType, details: Record<string, unknown>): Re
       return <span>{from_vessel ?? "Unknown vessel"} &rarr; {to_vessel ?? "Unknown vessel"}</span>;
     }
     case "tasting": {
-      const { aroma, flavor, appearance } = details as { aroma?: string; flavor?: string; appearance?: string };
+      const { aroma, flavor, appearance, palate, finish, overall_score } = details as {
+        aroma?: string; flavor?: string; appearance?: string;
+        palate?: string; finish?: string; overall_score?: string | number;
+      };
       const lines: { label: string; value: string }[] = [];
       if (appearance) lines.push({ label: "Appearance", value: String(appearance) });
       if (aroma) lines.push({ label: "Aroma", value: String(aroma) });
+      if (palate) lines.push({ label: "Palate", value: String(palate) });
+      if (finish) lines.push({ label: "Finish", value: String(finish) });
       if (flavor) lines.push({ label: "Flavor", value: String(flavor) });
+      if (overall_score != null) lines.push({ label: "Score", value: `${String(overall_score)}/5` });
       if (lines.length === 0) return null;
       return (
         <div className="flex flex-col">
