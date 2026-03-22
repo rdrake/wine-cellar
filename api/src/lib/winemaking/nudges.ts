@@ -85,6 +85,19 @@ function considerPressing(ctx: NudgeContext): Nudge | null {
     id: "consider-pressing",
     priority: "action",
     message: "Consider pressing \u2014 SG is approaching 1.010",
+    detail: "Typical skin contact: 5\u20137 days for a balanced red, 3\u20135 days for light/fruity, 7\u201310 days for full-bodied.",
+    stage: ctx.stage,
+  };
+}
+
+function considerPressingRose(ctx: NudgeContext): Nudge | null {
+  if (ctx.stage !== "primary_fermentation") return null;
+  if (ctx.wineType !== "ros\u00e9") return null;
+
+  return {
+    id: "consider-pressing-rose",
+    priority: "info",
+    message: "Press after 6\u201324 hours of skin contact, depending on desired color depth",
     stage: ctx.stage,
   };
 }
@@ -148,6 +161,7 @@ const evaluators: Evaluator[] = [
   punchDown,
   tempHighPrimary,
   considerPressing,
+  considerPressingRose,
   mlfSuggestion,
   so2MlfWarning,
   so2Racking,

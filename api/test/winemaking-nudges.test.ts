@@ -142,6 +142,42 @@ describe("winemaking nudges", () => {
       );
       expect(findNudge(nudges, "consider-pressing")).toBeNull();
     });
+
+    it("includes skin contact guidance in detail for red", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "red", latestGravity: 1.015 })
+      );
+      const nudge = findNudge(nudges, "consider-pressing");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.detail).toBeDefined();
+      expect(nudge!.detail).toContain("skin contact");
+    });
+  });
+
+  describe("consider-pressing-rose", () => {
+    it("suggests pressing for rosé during primary fermentation", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "rosé" })
+      );
+      const nudge = findNudge(nudges, "consider-pressing-rose");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.priority).toBe("info");
+      expect(nudge!.message).toContain("6–24 hours");
+    });
+
+    it("does not show rosé pressing nudge for red wine", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "red" })
+      );
+      expect(findNudge(nudges, "consider-pressing-rose")).toBeNull();
+    });
+
+    it("does not show rosé pressing nudge outside primary fermentation", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "secondary_fermentation", wineType: "rosé" })
+      );
+      expect(findNudge(nudges, "consider-pressing-rose")).toBeNull();
+    });
   });
 
   describe("mlf-suggestion", () => {
