@@ -65,7 +65,7 @@ webhook.post("/rapt", async (c) => {
       "SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? ORDER BY source_timestamp ASC LIMIT 200"
     ).bind(batchId).all<any>();
 
-    const batch = await db.prepare("SELECT stage, target_gravity FROM batches WHERE id = ? AND status = 'active'")
+    const batch = await db.prepare("SELECT stage, target_gravity, wine_type FROM batches WHERE id = ? AND status = 'active'")
       .bind(batchId).first<any>();
 
     if (batch) {
@@ -73,6 +73,7 @@ webhook.post("/rapt", async (c) => {
         batchId,
         userId,
         stage: batch.stage,
+        wineType: batch.wine_type ?? "red",
         targetGravity: batch.target_gravity,
         hasAssignedDevice: true,
         readings: recentReadings.results,

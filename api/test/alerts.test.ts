@@ -161,6 +161,14 @@ describe("evaluateAlerts", () => {
     expect(result.some((a) => a.type === "temp_low")).toBe(false);
   });
 
+  it("does not fire temp_low for white wine at 9°C", () => {
+    const readings = [
+      { gravity: 1.05, temperature: 9, source_timestamp: hoursAgo(1) },
+    ];
+    const result = evaluateAlerts(ctx({ wineType: "white", readings }));
+    expect(result.some((a) => a.type === "temp_low")).toBe(false);
+  });
+
   it("skips temp checks when temperature is null", () => {
     const readings = [
       { gravity: 1.05, temperature: null, source_timestamp: hoursAgo(1) },
