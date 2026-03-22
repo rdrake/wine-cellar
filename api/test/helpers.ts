@@ -100,11 +100,13 @@ export async function seedSession(email: string = TEST_USER_EMAIL): Promise<{ to
 // A valid base64url-encoded webauthn user ID for testing
 const TEST_WEBAUTHN_USER_ID = "dGVzdC13ZWJhdXRobi11c2VyLWlk"; // base64url of "test-webauthn-user-id"
 
-export async function seedCredential(userId: string): Promise<void> {
+export async function seedCredential(userId: string, opts?: { id?: string; name?: string }): Promise<void> {
+  const credId = opts?.id ?? "test-credential-id";
+  const name = opts?.name ?? null;
   await env.DB.prepare(
-    `INSERT INTO passkey_credentials (id, user_id, public_key, webauthn_user_id, sign_count, transports, device_type, backed_up)
-     VALUES (?, ?, X'00', ?, 0, '["internal"]', 'multiDevice', 1)`,
-  ).bind("test-credential-id", userId, TEST_WEBAUTHN_USER_ID).run();
+    `INSERT INTO passkey_credentials (id, user_id, public_key, webauthn_user_id, sign_count, transports, device_type, backed_up, name)
+     VALUES (?, ?, X'00', ?, 0, '["internal"]', 'multiDevice', 1, ?)`,
+  ).bind(credId, userId, TEST_WEBAUTHN_USER_ID, name).run();
 }
 
 export async function createBatch(overrides: Record<string, unknown> = {}, email?: string) {

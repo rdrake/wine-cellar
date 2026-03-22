@@ -401,7 +401,7 @@ auth.post("/register/options", async (c) => {
 auth.post("/register", async (c) => {
   const db = c.env.DB;
   const user = c.get("user");
-  const body = await c.req.json<{ challengeId: string; credential: any }>();
+  const body = await c.req.json<{ challengeId: string; credential: any; name?: string }>();
 
   // Consume challenge
   const challengeData = await consumeChallenge(
@@ -445,11 +445,13 @@ auth.post("/register", async (c) => {
     existingCred?.webauthn_user_id ??
     base64UrlEncode(crypto.getRandomValues(new Uint8Array(64)).buffer);
 
+  const credentialName = body.name && typeof body.name === "string" ? body.name.trim().slice(0, 100) : null;
+
   // Store credential
   await db
     .prepare(
-      `INSERT INTO passkey_credentials (id, user_id, public_key, webauthn_user_id, sign_count, transports, device_type, backed_up)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO passkey_credentials (id, user_id, public_key, webauthn_user_id, sign_count, transports, device_type, backed_up, name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       credential.id,
@@ -460,6 +462,7 @@ auth.post("/register", async (c) => {
       JSON.stringify(credential.transports ?? []),
       credentialDeviceType,
       credentialBackedUp ? 1 : 0,
+      credentialName,
     )
     .run();
 
@@ -496,6 +499,47 @@ auth.delete("/api-keys/:id", async (c) => {
   const deleted = await deleteApiKey(c.env.DB, id, user.id);
   if (!deleted) {
     return notFound("API key");
+  }
+  return c.body(null, 204);
+});
+
+// GET /passkeys — list passkeys for the authenticated user (requires session)
+auth.get("/passkeys", async (c) => {
+  const user = c.get("user");
+  const rows = await c.env.DB
+    .prepare(
+      "SELECT id, name, device_type, backed_up, created_at, last_used_at FROM passkey_credentials WHERE user_id = ? ORDER BY created_at DESC",
+    )
+    .bind(user.id)
+    .all<{
+      id: string;
+      name: string | null;
+      device_type: string | null;
+      backed_up: number;
+      created_at: string;
+      last_used_at: string | null;
+    }>();
+  const items = rows.results.map((r) => ({
+    id: r.id,
+    name: r.name,
+    deviceType: r.device_type,
+    backedUp: r.backed_up === 1,
+    createdAt: r.created_at,
+    lastUsedAt: r.last_used_at,
+  }));
+  return c.json({ items });
+});
+
+// DELETE /passkeys/:id — revoke a passkey (requires session)
+auth.delete("/passkeys/:id", async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+  const result = await c.env.DB
+    .prepare("DELETE FROM passkey_credentials WHERE id = ? AND user_id = ?")
+    .bind(id, user.id)
+    .run();
+  if ((result.meta?.changes ?? 0) === 0) {
+    return notFound("Passkey");
   }
   return c.body(null, 204);
 });

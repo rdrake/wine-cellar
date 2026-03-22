@@ -496,6 +496,88 @@ describe("DELETE /api/v1/auth/api-keys/:id", () => {
   });
 });
 
+describe("GET /api/v1/auth/passkeys", () => {
+  it("returns 401 without auth", async () => {
+    const { status } = await fetchJson("/api/v1/auth/passkeys");
+    expect(status).toBe(401);
+  });
+
+  it("returns empty list when no passkeys", async () => {
+    const { status, json } = await fetchJson("/api/v1/auth/passkeys", {
+      headers: await authHeaders(),
+    });
+    expect(status).toBe(200);
+    expect(json.items).toEqual([]);
+  });
+
+  it("lists passkeys for authenticated user", async () => {
+    const { token, userId } = await seedSession();
+    await seedCredential(userId, { name: "MacBook Pro" });
+    const { status, json } = await fetchJson("/api/v1/auth/passkeys", {
+      headers: sessionHeaders(token),
+    });
+    expect(status).toBe(200);
+    expect(json.items).toHaveLength(1);
+    expect(json.items[0].name).toBe("MacBook Pro");
+    expect(json.items[0].deviceType).toBe("multiDevice");
+    expect(json.items[0].backedUp).toBe(true);
+    expect(json.items[0].createdAt).toBeDefined();
+    // Should NOT expose public key
+    expect(json.items[0].publicKey).toBeUndefined();
+  });
+
+  it("does not list other users passkeys", async () => {
+    const { userId: otherUserId } = await seedSession("other@example.com");
+    await seedCredential(otherUserId, { id: "other-cred", name: "Other" });
+    const { json } = await fetchJson("/api/v1/auth/passkeys", {
+      headers: await authHeaders("me@example.com"),
+    });
+    expect(json.items).toHaveLength(0);
+  });
+});
+
+describe("DELETE /api/v1/auth/passkeys/:id", () => {
+  it("returns 401 without auth", async () => {
+    const { status } = await fetchJson("/api/v1/auth/passkeys/some-id", {
+      method: "DELETE",
+    });
+    expect(status).toBe(401);
+  });
+
+  it("revokes an existing passkey", async () => {
+    const { token, userId } = await seedSession();
+    await seedCredential(userId, { id: "cred-to-delete", name: "Old Phone" });
+    const { status } = await fetchJson("/api/v1/auth/passkeys/cred-to-delete", {
+      method: "DELETE",
+      headers: sessionHeaders(token),
+    });
+    expect(status).toBe(204);
+    // Verify it's gone
+    const { json } = await fetchJson("/api/v1/auth/passkeys", {
+      headers: sessionHeaders(token),
+    });
+    expect(json.items).toHaveLength(0);
+  });
+
+  it("returns 404 for nonexistent passkey", async () => {
+    const { status } = await fetchJson("/api/v1/auth/passkeys/nonexistent", {
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
+    expect(status).toBe(404);
+  });
+
+  it("returns 404 when deleting another users passkey", async () => {
+    const { userId: ownerId } = await seedSession("owner@example.com");
+    await seedCredential(ownerId, { id: "owner-cred", name: "Owner" });
+    const { status } = await fetchJson("/api/v1/auth/passkeys/owner-cred", {
+      method: "DELETE",
+      headers: await authHeaders("attacker@example.com"),
+    });
+    expect(status).toBe(404);
+  });
+});
+
 describe("auth cron cleanup", () => {
   it("removes expired sessions and challenges", async () => {
     const { token } = await seedSession();
