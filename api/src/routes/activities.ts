@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { ActivityCreateSchema, ActivityUpdateSchema } from "../models";
-import { WAYPOINT_ALLOWED_STAGES, type BatchStage } from "../schema";
+import { WAYPOINT_ALLOWED_STAGES, type BatchStage, type AllStage } from "../schema";
 import { notFound, conflict, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
+import type { BatchRow, ActivityRow } from "../db-types";
 
 const activities = new Hono<AppEnv>();
 
@@ -15,7 +16,7 @@ activities.post("/", async (c) => {
   const db = c.env.DB;
   const user = c.get("user");
   const batchId = c.req.param("batchId");
-  const batch = await db.prepare("SELECT * FROM batches WHERE id = ? AND user_id = ?").bind(batchId, user.id).first<any>();
+  const batch = await db.prepare("SELECT * FROM batches WHERE id = ? AND user_id = ?").bind(batchId, user.id).first<BatchRow>();
   if (!batch) return notFound("Batch");
   if (batch.status !== "active") return conflict("Only active batches can log activities");
 
@@ -23,8 +24,8 @@ activities.post("/", async (c) => {
   const parsed = ActivityCreateSchema.safeParse(body);
   if (!parsed.success) return validationError(parsed.error.issues);
 
-  const allowed = WAYPOINT_ALLOWED_STAGES[batch.stage as BatchStage] ?? [];
-  if (!allowed.includes(parsed.data.stage as any)) {
+  const allowed = WAYPOINT_ALLOWED_STAGES[batch.stage] ?? [];
+  if (!allowed.includes(parsed.data.stage as AllStage)) {
     return conflict(`Stage '${parsed.data.stage}' not allowed when batch is at '${batch.stage}'`);
   }
 
@@ -54,9 +55,9 @@ activities.post("/", async (c) => {
       detailsJson, parsed.data.recorded_at, now, now, readingId)
     .run();
 
-  const row = await db.prepare("SELECT * FROM activities WHERE id = ?").bind(id).first<any>();
-  row.details = row.details ? JSON.parse(row.details) : null;
-  return c.json(row, 201);
+  const row = await db.prepare("SELECT * FROM activities WHERE id = ?").bind(id).first<ActivityRow>();
+  if (!row) return notFound("Activity");
+  return c.json({ ...row, details: row.details ? JSON.parse(row.details) : null }, 201);
 });
 
 activities.get("/", async (c) => {
@@ -78,8 +79,8 @@ activities.get("/", async (c) => {
   if (endTime) { sql += " AND recorded_at <= ?"; params.push(endTime); }
   sql += " ORDER BY recorded_at DESC";
 
-  const result = await db.prepare(sql).bind(...params).all<any>();
-  const items = result.results.map((row: any) => ({
+  const result = await db.prepare(sql).bind(...params).all<ActivityRow>();
+  const items = result.results.map((row) => ({
     ...row,
     details: row.details ? JSON.parse(row.details) : null,
   }));
@@ -92,7 +93,7 @@ activities.patch("/:activityId", async (c) => {
   const activityId = c.req.param("activityId");
 
   const row = await db.prepare("SELECT * FROM activities WHERE id = ? AND batch_id = ? AND user_id = ?")
-    .bind(activityId, batchId, c.get("user").id).first<any>();
+    .bind(activityId, batchId, c.get("user").id).first<ActivityRow>();
   if (!row) return notFound("Activity");
 
   const body = await c.req.json().catch(() => null);
@@ -107,8 +108,7 @@ activities.patch("/:activityId", async (c) => {
   }
 
   if (Object.keys(updates).length === 0) {
-    row.details = row.details ? JSON.parse(row.details) : null;
-    return c.json(row);
+    return c.json({ ...row, details: row.details ? JSON.parse(row.details) : null });
   }
 
   updates.updated_at = nowUtc();
@@ -130,9 +130,9 @@ activities.patch("/:activityId", async (c) => {
     }
   }
 
-  const updated = await db.prepare("SELECT * FROM activities WHERE id = ?").bind(activityId).first<any>();
-  updated.details = updated.details ? JSON.parse(updated.details) : null;
-  return c.json(updated);
+  const updated = await db.prepare("SELECT * FROM activities WHERE id = ?").bind(activityId).first<ActivityRow>();
+  if (!updated) return notFound("Activity");
+  return c.json({ ...updated, details: updated.details ? JSON.parse(updated.details) : null });
 });
 
 activities.delete("/:activityId", async (c) => {
@@ -140,7 +140,7 @@ activities.delete("/:activityId", async (c) => {
   const batchId = c.req.param("batchId");
   const activityId = c.req.param("activityId");
   const row = await db.prepare("SELECT * FROM activities WHERE id = ? AND batch_id = ? AND user_id = ?")
-    .bind(activityId, batchId, c.get("user").id).first<any>();
+    .bind(activityId, batchId, c.get("user").id).first<ActivityRow>();
   if (!row) return notFound("Activity");
 
   // Delete the linked manual reading if present

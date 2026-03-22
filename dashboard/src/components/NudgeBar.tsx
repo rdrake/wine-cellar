@@ -50,7 +50,7 @@ export default function NudgeBar({ nudges, batchId }: { nudges: Nudge[]; batchId
               <p className="text-sm font-medium">{nudge.message}</p>
               {nudge.detail && <p className="text-xs text-muted-foreground mt-1">{nudge.detail}</p>}
             </div>
-            <Button variant="ghost" size="sm" className="shrink-0 text-xs" onClick={() => handleDismiss(nudge.id)}>
+            <Button variant="ghost" size="sm" className="shrink-0 text-xs" aria-label={`Dismiss: ${nudge.message}`} onClick={() => handleDismiss(nudge.id)}>
               Dismiss
             </Button>
           </CardContent>

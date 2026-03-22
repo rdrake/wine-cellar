@@ -6,7 +6,11 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
-import type { AuthenticatorTransportFuture } from "@simplewebauthn/server";
+import type {
+  AuthenticatorTransportFuture,
+  AuthenticationResponseJSON,
+  RegistrationResponseJSON,
+} from "@simplewebauthn/server";
 import { GitHub } from "arctic";
 import { storeChallenge, consumeChallenge } from "../lib/auth-challenge";
 import {
@@ -268,7 +272,7 @@ auth.post("/login/options", async (c) => {
 // POST /login — verify authentication response and create session
 auth.post("/login", async (c) => {
   const db = c.env.DB;
-  const body = await c.req.json<{ challengeId: string; credential: any }>();
+  const body = await c.req.json<{ challengeId: string; credential: AuthenticationResponseJSON }>();
 
   // Consume challenge
   const challengeData = await consumeChallenge(db, body.challengeId, "login");
@@ -401,7 +405,7 @@ auth.post("/register/options", async (c) => {
 auth.post("/register", async (c) => {
   const db = c.env.DB;
   const user = c.get("user");
-  const body = await c.req.json<{ challengeId: string; credential: any; name?: string }>();
+  const body = await c.req.json<{ challengeId: string; credential: RegistrationResponseJSON; name?: string }>();
 
   // Consume challenge
   const challengeData = await consumeChallenge(

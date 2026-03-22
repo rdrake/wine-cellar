@@ -117,6 +117,8 @@ export default function ReadingsChart({ readings, activities, batchStartedAt, lo
                   range === r ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground"
                 )}
                 onClick={() => setRange(r)}
+                aria-label={r === "all" ? "Show all readings" : `Show last ${r.replace("d", " days")}`}
+                aria-pressed={range === r}
               >
                 {r === "all" ? "All" : r.toUpperCase()}
               </button>
@@ -142,7 +144,7 @@ export default function ReadingsChart({ readings, activities, batchStartedAt, lo
 
       {all.length > 0 && (
         <>
-          <div className="h-72 w-full">
+          <div className="h-72 w-full" role="img" aria-label="Gravity and temperature readings chart over time">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart margin={{ top: 12, right: 5, bottom: 5, left: 0 }}>
                 <XAxis

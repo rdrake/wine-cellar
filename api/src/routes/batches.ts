@@ -5,12 +5,13 @@ import { notFound, conflict, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
 import { WAYPOINT_ORDER } from "../schema";
 import { generateNudges, projectTimeline, computeCurrentPhase, calculateDrinkWindow, fetchWinemakingActivityContext, fetchStageEnteredAt, computeVelocityPerDay } from "../lib/winemaking";
+import type { BatchRow, ReadingSummaryRow, BatchDependencyCheckRow, PhValueRow, GravityRow } from "../db-types";
 
 const batches = new Hono<AppEnv>();
 
 async function getOwnedBatch(db: D1Database, batchId: string, userId: string) {
   return db.prepare("SELECT * FROM batches WHERE id = ? AND user_id = ?")
-    .bind(batchId, userId).first<any>();
+    .bind(batchId, userId).first<BatchRow>();
 }
 
 batches.post("/", async (c) => {
@@ -86,10 +87,10 @@ batches.get("/:batchId", async (c) => {
            WHERE batch_id = ? AND user_id = ? AND type = 'measurement'
            AND json_extract(details, '$.metric') = 'pH'
            ORDER BY recorded_at DESC LIMIT 1`
-        ).bind(batchId, userId).first<any>(),
+        ).bind(batchId, userId).first<PhValueRow>(),
         db.prepare(
           "SELECT gravity FROM readings WHERE batch_id = ? ORDER BY source_timestamp DESC LIMIT 1"
-        ).bind(batchId).first<any>(),
+        ).bind(batchId).first<GravityRow>(),
       ]);
 
       cellaring = calculateDrinkWindow({
@@ -111,7 +112,7 @@ batches.get("/:batchId", async (c) => {
   const [activityCtx, recentReadings, stageEnteredAt] = await Promise.all([
     fetchWinemakingActivityContext(db, batchId, userId),
     db.prepare("SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? ORDER BY source_timestamp DESC LIMIT 10")
-      .bind(batchId).all<any>(),
+      .bind(batchId).all<ReadingSummaryRow>(),
     fetchStageEnteredAt(db, batchId, userId, row.stage),
   ]);
 
@@ -234,8 +235,8 @@ batches.delete("/:batchId", async (c) => {
         "EXISTS(SELECT 1 FROM readings WHERE batch_id = ?) AS has_readings"
       )
       .bind(batchId, batchId)
-      .first<any>();
-    if (check.has_activities || check.has_readings) {
+      .first<BatchDependencyCheckRow>();
+    if (check!.has_activities || check!.has_readings) {
       return conflict("Batch has activities or readings. Abandon first.");
     }
   }

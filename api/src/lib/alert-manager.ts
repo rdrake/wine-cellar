@@ -3,6 +3,7 @@
 import type { AlertCandidate, AlertType } from "./alerts";
 import { nowUtc } from "./time";
 import { sendPushToUser, type PushPayload } from "./web-push";
+import type { ActiveAlertRow } from "../db-types";
 
 export interface FiredAlert {
   id: string;
@@ -94,13 +95,13 @@ export async function resolveCleared(
        WHERE user_id = ? AND batch_id = ? AND resolved_at IS NULL`,
     )
     .bind(userId, batchId)
-    .all();
+    .all<{ id: string; alert_type: string }>();
 
   for (const row of results) {
     if (!activeTypes.has(row.alert_type as AlertType)) {
       await db
         .prepare(`UPDATE alert_state SET resolved_at = ? WHERE id = ?`)
-        .bind(now, row.id as string)
+        .bind(now, row.id)
         .run();
     }
   }
@@ -113,7 +114,7 @@ export async function resolveCleared(
 export async function getActiveAlerts(
   db: D1Database,
   userId: string,
-): Promise<any[]> {
+): Promise<ActiveAlertRow[]> {
   const { results } = await db
     .prepare(
       `SELECT a.id, a.user_id, a.batch_id, a.alert_type, a.context, a.fired_at,
@@ -124,7 +125,7 @@ export async function getActiveAlerts(
        ORDER BY a.fired_at DESC`,
     )
     .bind(userId)
-    .all();
+    .all<ActiveAlertRow>();
 
   return results;
 }

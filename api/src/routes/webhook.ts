@@ -6,6 +6,7 @@ import { nowUtc } from "../lib/time";
 import { timingSafeEqual } from "../lib/crypto";
 import { evaluateAlerts, type BatchAlertContext } from "../lib/alerts";
 import { processAlerts, resolveCleared, sendAlertPushes } from "../lib/alert-manager";
+import type { DeviceBatchRow, ReadingSummaryRow, BatchAlertRow, BatchNameRow } from "../db-types";
 
 const webhook = new Hono<{ Bindings: Bindings }>();
 
@@ -28,7 +29,7 @@ webhook.post("/rapt", async (c) => {
   const body = parsed.data;
 
   // Auto-register unknown device; resolve batch_id and user_id
-  const device = await db.prepare("SELECT batch_id, user_id FROM devices WHERE id = ?").bind(body.device_id).first<any>();
+  const device = await db.prepare("SELECT batch_id, user_id FROM devices WHERE id = ?").bind(body.device_id).first<DeviceBatchRow>();
   let batchId: string | null;
   let userId: string | null;
   if (!device) {
@@ -52,8 +53,8 @@ webhook.post("/rapt", async (c) => {
       .bind(readingId, batchId, body.device_id, body.gravity, body.temperature,
         body.battery, body.rssi, body.created_date, now, userId)
       .run();
-  } catch (e: any) {
-    if (String(e).includes("UNIQUE")) {
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message.includes("UNIQUE")) {
       return c.json({ status: "duplicate", message: "Reading already exists" });
     }
     throw e;
@@ -63,10 +64,10 @@ webhook.post("/rapt", async (c) => {
   if (batchId && userId) {
     const recentReadings = await db.prepare(
       "SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? ORDER BY source_timestamp ASC LIMIT 200"
-    ).bind(batchId).all<any>();
+    ).bind(batchId).all<ReadingSummaryRow>();
 
     const batch = await db.prepare("SELECT stage, target_gravity, wine_type FROM batches WHERE id = ? AND status = 'active'")
-      .bind(batchId).first<any>();
+      .bind(batchId).first<BatchAlertRow>();
 
     if (batch) {
       const ctx: BatchAlertContext = {
@@ -84,7 +85,7 @@ webhook.post("/rapt", async (c) => {
       await resolveCleared(db, userId, batchId, candidates);
 
       if (fired.length > 0) {
-        const batchRow = await db.prepare("SELECT name FROM batches WHERE id = ?").bind(batchId).first<any>();
+        const batchRow = await db.prepare("SELECT name FROM batches WHERE id = ?").bind(batchId).first<BatchNameRow>();
         if (batchRow) {
           await sendAlertPushes(db, userId, batchRow.name, fired, c.env.VAPID_PUBLIC_KEY, c.env.VAPID_PRIVATE_KEY);
         }

@@ -18,6 +18,7 @@ export default function BottomNav() {
             key={tab.to}
             to={tab.to}
             end={tab.to === "/"}
+            aria-label={`Navigate to ${tab.label}`}
             className={({ isActive }) =>
               cn(
                 "flex flex-col items-center py-3 px-4 text-xs min-w-[64px] transition-colors relative",
@@ -31,7 +32,7 @@ export default function BottomNav() {
                   "flex items-center justify-center w-10 h-7 rounded-full mb-0.5 transition-colors",
                   isActive && "bg-primary/10"
                 )}>
-                  <tab.icon className="size-5" strokeWidth={isActive ? 2 : 1.5} />
+                  <tab.icon className="size-5" strokeWidth={isActive ? 2 : 1.5} aria-hidden="true" />
                 </span>
                 {tab.label}
               </>

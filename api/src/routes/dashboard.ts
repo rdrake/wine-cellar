@@ -14,50 +14,59 @@ dashboard.get("/", async (c) => {
     .bind(user.id)
     .all<any>();
 
-  const batchSummaries = await Promise.all(
-    batches.results.map(async (batch: any) => {
-      // All readings for sparkline (chronological, capped at 200)
-      const readings = await db
-        .prepare("SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? AND user_id = ? ORDER BY source_timestamp ASC LIMIT 200")
-        .bind(batch.id, user.id)
-        .all<any>();
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
-      const points = readings.results;
-      const first = points.length > 0 ? points[0] : null;
-      const latest = points.length > 0 ? points[points.length - 1] : null;
+  // Build per-batch statements for readings and velocity in a single D1 batch
+  const readingsStmts = batches.results.map((batch: any) =>
+    db
+      .prepare("SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? AND user_id = ? ORDER BY source_timestamp ASC LIMIT 200")
+      .bind(batch.id, user.id),
+  );
+  const velocityStmts = batches.results.map((batch: any) =>
+    db
+      .prepare("SELECT gravity, source_timestamp FROM readings WHERE batch_id = ? AND user_id = ? AND source_timestamp >= ? ORDER BY source_timestamp ASC LIMIT 1")
+      .bind(batch.id, user.id, cutoff),
+  );
 
-      // Velocity: SG drop per day over last 48h
-      let velocity: number | null = null;
-      if (latest) {
-        const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-        const oldest48h = await db
-          .prepare("SELECT gravity, source_timestamp FROM readings WHERE batch_id = ? AND user_id = ? AND source_timestamp >= ? ORDER BY source_timestamp ASC LIMIT 1")
-          .bind(batch.id, user.id, cutoff)
-          .first<any>();
+  // Fire all per-batch queries in a single round-trip
+  const allStmts = [...readingsStmts, ...velocityStmts];
+  const batchResults = allStmts.length > 0 ? await db.batch(allStmts) : [];
 
-        if (oldest48h && oldest48h.source_timestamp !== latest.source_timestamp) {
-          const dt = (new Date(latest.source_timestamp).getTime() - new Date(oldest48h.source_timestamp).getTime()) / (1000 * 60 * 60 * 24);
-          if (dt > 0) {
-            velocity = (latest.gravity - oldest48h.gravity) / dt;
-          }
+  const numBatches = batches.results.length;
+
+  const batchSummaries = batches.results.map((batch: any, i: number) => {
+    const points = (batchResults[i] as D1Result<any>).results ?? [];
+    const first = points.length > 0 ? points[0] : null;
+    const latest = points.length > 0 ? points[points.length - 1] : null;
+
+    // Velocity: SG drop per day over last 48h
+    let velocity: number | null = null;
+    if (latest) {
+      const velocityResult = batchResults[numBatches + i] as D1Result<any>;
+      const oldest48h = velocityResult.results?.[0] ?? null;
+
+      if (oldest48h && oldest48h.source_timestamp !== latest.source_timestamp) {
+        const dt = (new Date(latest.source_timestamp).getTime() - new Date(oldest48h.source_timestamp).getTime()) / (1000 * 60 * 60 * 24);
+        if (dt > 0) {
+          velocity = (latest.gravity - oldest48h.gravity) / dt;
         }
       }
+    }
 
-      // Days fermenting
-      const daysFermenting = Math.floor(
-        (Date.now() - new Date(batch.started_at).getTime()) / (1000 * 60 * 60 * 24)
-      );
+    // Days fermenting
+    const daysFermenting = Math.floor(
+      (Date.now() - new Date(batch.started_at).getTime()) / (1000 * 60 * 60 * 24)
+    );
 
-      return {
-        ...batch,
-        first_reading: first,
-        latest_reading: latest,
-        velocity,
-        days_fermenting: daysFermenting,
-        sparkline: points.map((p: any) => ({ g: p.gravity, temp: p.temperature, t: p.source_timestamp })),
-      };
-    }),
-  );
+    return {
+      ...batch,
+      first_reading: first,
+      latest_reading: latest,
+      velocity,
+      days_fermenting: daysFermenting,
+      sparkline: points.map((p: any) => ({ g: p.gravity, temp: p.temperature, t: p.source_timestamp })),
+    };
+  });
 
   // Recent activities across all batches
   const activities = await db

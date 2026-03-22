@@ -29,21 +29,7 @@ import NudgeBar from "@/components/NudgeBar";
 import BatchTimeline from "@/components/BatchTimeline";
 import CellaringCard from "@/components/CellaringCard";
 import { abv, attenuation, velocity, tempStats, daysSince, projectedDaysToTarget } from "@/lib/fermentation";
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-function relativeTime(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days === 1) return "yesterday";
-  if (days < 30) return `${days}d ago`;
-  return new Date(isoDate).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+import { relativeTime } from "@/lib/dates";
 
 // ── Snapshot Card ────────────────────────────────────────────────────
 
@@ -433,8 +419,9 @@ export default function BatchDetail() {
           <button
             className="flex items-center gap-1 text-sm font-semibold w-full text-left"
             onClick={() => setNotesOpen(!notesOpen)}
+            aria-expanded={notesOpen}
           >
-            <span className="text-muted-foreground">{notesOpen ? "\u25BC" : "\u25B6"}</span>
+            <span className="text-muted-foreground" aria-hidden="true">{notesOpen ? "\u25BC" : "\u25B6"}</span>
             Batch Notes
           </button>
           {notesOpen && (

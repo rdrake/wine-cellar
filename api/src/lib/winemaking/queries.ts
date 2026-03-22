@@ -1,4 +1,5 @@
 import { SO2_CHEMICALS, MLF_CULTURES } from "../../schema";
+import type { CountLastAtRow, RecordedAtRow } from "../../db-types";
 
 const SO2_IN_SQL = SO2_CHEMICALS.map(c => `'${c}'`).join(", ");
 const MLF_IN_SQL = MLF_CULTURES.map(c => `'${c}'`).join(", ");
@@ -21,19 +22,19 @@ export async function fetchWinemakingActivityContext(
       `SELECT COUNT(*) as count, MAX(recorded_at) as last_at FROM activities
        WHERE batch_id = ? AND user_id = ? AND type = 'addition'
        AND json_extract(details, '$.chemical') IN (${SO2_IN_SQL})`
-    ).bind(batchId, userId).first<any>(),
+    ).bind(batchId, userId).first<CountLastAtRow>(),
 
     db.prepare(
       `SELECT COUNT(*) as count, MAX(recorded_at) as last_at FROM activities
        WHERE batch_id = ? AND user_id = ? AND type = 'racking'`
-    ).bind(batchId, userId).first<any>(),
+    ).bind(batchId, userId).first<CountLastAtRow>(),
 
     db.prepare(
       `SELECT recorded_at FROM activities
        WHERE batch_id = ? AND user_id = ? AND type = 'addition'
        AND json_extract(details, '$.chemical') IN (${MLF_IN_SQL})
        ORDER BY recorded_at ASC LIMIT 1`
-    ).bind(batchId, userId).first<any>(),
+    ).bind(batchId, userId).first<RecordedAtRow>(),
   ]);
 
   return {

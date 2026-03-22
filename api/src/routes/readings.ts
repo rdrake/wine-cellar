@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { notFound } from "../lib/errors";
 import { encodeCursor, decodeCursor } from "../lib/cursor";
+import type { ReadingRow } from "../db-types";
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
@@ -31,7 +32,7 @@ async function paginatedQuery(
   sql += " ORDER BY source_timestamp DESC, id DESC LIMIT ?";
   params.push(limit + 1);
 
-  const result = await db.prepare(sql).bind(...params).all<any>();
+  const result = await db.prepare(sql).bind(...params).all<ReadingRow>();
   const rows = result.results;
   const hasNext = rows.length > limit;
   const items = rows.slice(0, limit);

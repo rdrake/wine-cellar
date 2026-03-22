@@ -6,15 +6,15 @@ import { nowUtc } from "../lib/time";
 import { sendPushToUser } from "../lib/web-push";
 
 const SubscribeSchema = z.object({
-  endpoint: z.string().url(),
+  endpoint: z.string().url().max(2000),
   keys: z.object({
-    p256dh: z.string().min(1),
-    auth: z.string().min(1),
+    p256dh: z.string().min(1).max(500),
+    auth: z.string().min(1).max(500),
   }),
 });
 
 const UnsubscribeSchema = z.object({
-  endpoint: z.string().url(),
+  endpoint: z.string().url().max(2000),
 });
 
 const push = new Hono<AppEnv>();

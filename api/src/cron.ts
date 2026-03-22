@@ -3,6 +3,7 @@ import { processAlerts, resolveCleared, sendAlertPushes } from "./lib/alert-mana
 import { projectTimeline, evaluateTimelineAlerts, fetchWinemakingActivityContext, computeVelocityPerDay } from "./lib/winemaking";
 import { cleanupExpiredSessions } from "./lib/auth-session";
 import { cleanupExpiredChallenges } from "./lib/auth-challenge";
+import type { CronBatchRow, DeviceIdRow, ReadingSummaryRow } from "./db-types";
 
 export async function cleanupAuthTables(db: D1Database): Promise<void> {
   await Promise.all([
@@ -18,17 +19,17 @@ export async function evaluateAllBatches(
 ): Promise<void> {
   const batches = await db.prepare(
     "SELECT b.id, b.user_id, b.name, b.stage, b.target_gravity, b.started_at, b.wine_type, b.source_material, b.mlf_status FROM batches b WHERE b.status = 'active'"
-  ).all<any>();
+  ).all<CronBatchRow>();
 
   for (const batch of batches.results) {
     const [device, readings, activityCtx] = await Promise.all([
       db.prepare(
         "SELECT id FROM devices WHERE batch_id = ? AND user_id = ? LIMIT 1"
-      ).bind(batch.id, batch.user_id).first<any>(),
+      ).bind(batch.id, batch.user_id).first<DeviceIdRow>(),
 
       db.prepare(
         "SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? ORDER BY source_timestamp ASC LIMIT 200"
-      ).bind(batch.id).all<any>(),
+      ).bind(batch.id).all<ReadingSummaryRow>(),
 
       fetchWinemakingActivityContext(db, batch.id, batch.user_id),
     ]);

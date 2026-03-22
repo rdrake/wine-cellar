@@ -3,6 +3,7 @@ import type { AppEnv } from "../app";
 import { DeviceCreateSchema, DeviceAssignSchema } from "../models";
 import { notFound, conflict, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
+import type { BatchRow } from "../db-types";
 
 const devices = new Hono<AppEnv>();
 
@@ -19,8 +20,8 @@ devices.post("/", async (c) => {
       .prepare("INSERT INTO devices (id, name, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
       .bind(parsed.data.id, parsed.data.name, user.id, now, now)
       .run();
-  } catch (e: any) {
-    if (String(e).includes("UNIQUE")) return conflict("Device already registered");
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message.includes("UNIQUE")) return conflict("Device already registered");
     throw e;
   }
   return c.json(
@@ -69,7 +70,7 @@ devices.post("/:deviceId/assign", async (c) => {
   const parsed = DeviceAssignSchema.safeParse(body);
   if (!parsed.success) return validationError(parsed.error.issues);
 
-  const batch = await db.prepare("SELECT * FROM batches WHERE id = ? AND user_id = ?").bind(parsed.data.batch_id, user.id).first<any>();
+  const batch = await db.prepare("SELECT * FROM batches WHERE id = ? AND user_id = ?").bind(parsed.data.batch_id, user.id).first<BatchRow>();
   if (!batch) return notFound("Batch");
   if (batch.status !== "active") return conflict("Can only assign to active batches");
 
