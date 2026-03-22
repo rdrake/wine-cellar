@@ -16,25 +16,10 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { timeAgo } from "@/lib/dates";
 import type { Device, Batch, Reading, Passkey } from "@/types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
-
-function relativeTime(isoDate: string): string {
-  // SQLite datetime('now') omits the Z suffix — append it if missing so
-  // the browser parses the timestamp as UTC rather than local time.
-  const normalized = isoDate.endsWith("Z") || isoDate.includes("+") ? isoDate : isoDate + "Z";
-  const diff = Date.now() - new Date(normalized).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days === 1) return "yesterday";
-  if (days < 30) return `${days}d ago`;
-  return new Date(isoDate).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
 
 function batteryColor(pct: number): string {
   if (pct > 50) return "text-green-600 dark:text-green-400";
@@ -122,7 +107,7 @@ function DeviceCard({ device, batchName, onAssign, onUnassign }: {
               </span>
             )}
             <span className="text-muted-foreground">
-              {relativeTime(latest.source_timestamp)}
+              {timeAgo(latest.source_timestamp)}
             </span>
           </div>
         ) : (
@@ -430,8 +415,8 @@ function ApiKeysSection() {
           <div>
             <p className="text-sm font-medium">{k.name}</p>
             <p className="text-xs text-muted-foreground font-mono">
-              {k.prefix}{"..."} · created {relativeTime(k.createdAt)}
-              {k.lastUsedAt ? ` · used ${relativeTime(k.lastUsedAt)}` : " · never used"}
+              {k.prefix}{"..."} · created {timeAgo(k.createdAt)}
+              {k.lastUsedAt ? ` · used ${timeAgo(k.lastUsedAt)}` : " · never used"}
             </p>
           </div>
           <Button size="sm" variant="ghost" className="text-destructive h-7 text-xs" onClick={() => handleRevoke(k.id)}>
@@ -585,8 +570,8 @@ function PasskeysSection() {
           <div>
             <p className="text-sm font-medium">{pk.name ?? "Unnamed passkey"}</p>
             <p className="text-xs text-muted-foreground">
-              Created {relativeTime(pk.createdAt)}
-              {pk.lastUsedAt ? ` · used ${relativeTime(pk.lastUsedAt)}` : " · never used"}
+              Created {timeAgo(pk.createdAt)}
+              {pk.lastUsedAt ? ` · used ${timeAgo(pk.lastUsedAt)}` : " · never used"}
             </p>
           </div>
           <div className="flex items-center gap-2">
