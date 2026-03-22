@@ -1,53 +1,75 @@
+import { env, SELF } from "cloudflare:test";
 import { describe, it, expect, beforeEach } from "vitest";
-import { env } from "cloudflare:test";
-import { applyMigrations, authHeaders, fetchJson, TEST_USER_EMAIL } from "./helpers";
-import { createSession } from "../src/lib/auth-session";
+import { applyMigrations, sessionHeaders } from "./helpers";
+import { createSession, hashToken } from "../src/lib/auth-session";
+
+async function seedUserWithSession(email: string = "test@example.com") {
+  const userId = crypto.randomUUID();
+  await env.DB.prepare(
+    "INSERT INTO users (id, email, created_at) VALUES (?, ?, datetime('now'))",
+  )
+    .bind(userId, email)
+    .run();
+  const { token } = await createSession(env.DB, userId);
+  return { userId, token };
+}
 
 describe("auth middleware", () => {
-  let userId: string;
-
   beforeEach(async () => {
     await applyMigrations();
-    await fetchJson("/api/v1/me", { headers: authHeaders() });
-    const user = await env.DB.prepare("SELECT id FROM users WHERE email = ?")
-      .bind(TEST_USER_EMAIL).first<{ id: string }>();
-    userId = user!.id;
   });
 
-  it("allows exempt route /api/v1/auth/status without auth", async () => {
-    const { status } = await fetchJson("/api/v1/auth/status");
-    expect(status).not.toBe(401);
+  it("allows exempt auth routes without session", async () => {
+    const routes = ["/api/v1/auth/status", "/api/v1/auth/settings"];
+    for (const route of routes) {
+      const res = await SELF.fetch(`https://localhost${route}`);
+      expect(res.status, `${route} should not be 401`).not.toBe(401);
+    }
   });
 
-  it("returns 401 for protected route without auth", async () => {
-    const { status } = await fetchJson("/api/v1/batches");
-    expect(status).toBe(401);
+  it("requires auth for protected routes", async () => {
+    const res = await SELF.fetch("https://localhost/api/v1/batches");
+    expect(res.status).toBe(401);
+  });
+
+  it("requires auth for passkey register and logout routes", async () => {
+    const registerRes = await SELF.fetch(
+      "https://localhost/api/v1/auth/register/options",
+      {
+        method: "POST",
+      },
+    );
+    expect(registerRes.status).toBe(401);
+
+    const logoutRes = await SELF.fetch(
+      "https://localhost/api/v1/auth/logout",
+      {
+        method: "POST",
+      },
+    );
+    expect(logoutRes.status).toBe(401);
   });
 
   it("authenticates via session cookie", async () => {
-    const { token } = await createSession(env.DB, userId);
-    const { status, json } = await fetchJson("/api/v1/me", {
-      headers: { Cookie: `session=${token}` },
+    const { token } = await seedUserWithSession("test@example.com");
+    const res = await SELF.fetch("https://localhost/api/v1/batches", {
+      headers: sessionHeaders(token),
     });
-    expect(status).toBe(200);
-    expect(json.email).toBe(TEST_USER_EMAIL);
+    expect(res.status).toBe(200);
   });
 
-  it("authenticates via CF Access JWT (backward compat)", async () => {
-    const { status, json } = await fetchJson("/api/v1/me", {
-      headers: authHeaders(),
-    });
-    expect(status).toBe(200);
-    expect(json.email).toBe(TEST_USER_EMAIL);
-  });
+  it("rejects expired sessions", async () => {
+    const { token } = await seedUserWithSession("test@example.com");
+    const hash = await hashToken(token);
+    await env.DB.prepare(
+      "UPDATE auth_sessions SET expires_at = datetime('now', '-1 hour') WHERE id = ?",
+    )
+      .bind(hash)
+      .run();
 
-  it("returns 401 for expired session cookie", async () => {
-    const { token, hash } = await createSession(env.DB, userId);
-    await env.DB.prepare("UPDATE auth_sessions SET expires_at = datetime('now', '-1 hour') WHERE id = ?")
-      .bind(hash).run();
-    const { status } = await fetchJson("/api/v1/batches", {
-      headers: { Cookie: `session=${token}` },
+    const res = await SELF.fetch("https://localhost/api/v1/batches", {
+      headers: sessionHeaders(token),
     });
-    expect(status).toBe(401);
+    expect(res.status).toBe(401);
   });
 });
