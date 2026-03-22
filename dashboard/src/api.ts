@@ -124,11 +124,9 @@ export const api = {
   },
   auth: {
     status: () =>
-      apiFetch<{ registered: boolean; authenticated: boolean }>("/api/v1/auth/status"),
-    bootstrapOptions: (data: { setupToken: string; email: string }) =>
-      apiFetch<{ challengeId: string; options: PublicKeyCredentialCreationOptionsJSON; webauthnUserId: string }>("/api/v1/auth/bootstrap/options", { method: "POST", body: data }),
-    bootstrap: (data: { challengeId: string; credential: unknown; setupToken: string; email: string; webauthnUserId: string }) =>
-      apiFetch<{ status: string }>("/api/v1/auth/bootstrap", { method: "POST", body: data }),
+      apiFetch<{ authenticated: boolean; isNewUser?: boolean; user?: { id: string; email: string; name: string | null; avatarUrl: string | null } }>("/api/v1/auth/status"),
+    settings: () =>
+      apiFetch<{ registrationsOpen: boolean }>("/api/v1/auth/settings"),
     loginOptions: () =>
       apiFetch<{ challengeId: string; options: PublicKeyCredentialRequestOptionsJSON }>("/api/v1/auth/login/options", { method: "POST" }),
     login: (data: { challengeId: string; credential: unknown }) =>
@@ -140,7 +138,12 @@ export const api = {
     logout: () =>
       apiFetch<{ status: string }>("/api/v1/auth/logout", { method: "POST" }),
   },
+  users: {
+    me: () =>
+      apiFetch<{ id: string; email: string; name: string | null; avatarUrl: string | null; onboarded: boolean }>("/api/v1/users/me"),
+    updateMe: (body: { name?: string; onboarded?: true }) =>
+      apiFetch<{ id: string; email: string; name: string | null; avatarUrl: string | null; onboarded: boolean }>("/api/v1/users/me", { method: "PATCH", body }),
+  },
   dashboard: () => apiFetch<DashboardResponse>("/api/v1/dashboard"),
   health: () => apiFetch<{ status: string }>("/health"),
-  me: () => apiFetch<{ id: string; email: string; name: string | null }>("/api/v1/me"),
 };

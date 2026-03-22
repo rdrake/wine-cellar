@@ -1,57 +1,64 @@
-import { useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { api, setOnUnauthorized } from "@/api";
-import Setup from "@/pages/Setup";
-import Login from "@/pages/Login";
+import { Login } from "@/pages/Login";
 
-interface AuthState {
-  registered: boolean;
-  authenticated: boolean;
+interface AuthUser {
+  id: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
 }
 
-export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const [authState, setAuthState] = useState<AuthState | null>(null);
-  const [loading, setLoading] = useState(true);
+interface AuthContextValue {
+  user: AuthUser;
+  isNewUser: boolean;
+  refreshAuth: () => Promise<void>;
+}
 
-  const checkStatus = useCallback(async () => {
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthGate");
+  return ctx;
+}
+
+export function AuthGate({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<{
+    authenticated: boolean;
+    isNewUser?: boolean;
+    user?: AuthUser;
+  } | null>(null);
+
+  const refreshAuth = async () => {
     try {
-      const status = await api.auth.status();
-      setAuthState(status);
+      const s = await api.auth.status();
+      setState(s);
     } catch {
-      setAuthState({ registered: false, authenticated: false });
-    } finally {
-      setLoading(false);
+      setState({ authenticated: false });
     }
-  }, []);
+  };
 
   useEffect(() => {
-    checkStatus();
-  }, [checkStatus]);
-
-  useEffect(() => {
-    setOnUnauthorized(() => {
-      setAuthState((prev) => prev ? { ...prev, authenticated: false } : null);
-    });
+    setOnUnauthorized(() => setState({ authenticated: false }));
+    refreshAuth();
   }, []);
 
-  if (loading) {
+  if (state === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading…</div>
       </div>
     );
   }
 
-  if (!authState?.registered) {
-    return (
-      <Setup onComplete={() => setAuthState({ registered: true, authenticated: true })} />
-    );
+  if (!state.authenticated || !state.user) {
+    return <Login />;
   }
 
-  if (!authState.authenticated) {
-    return (
-      <Login onComplete={() => setAuthState({ registered: true, authenticated: true })} />
-    );
-  }
-
-  return <>{children}</>;
+  return (
+    <AuthContext.Provider value={{ user: state.user, isNewUser: state.isNewUser ?? false, refreshAuth }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }

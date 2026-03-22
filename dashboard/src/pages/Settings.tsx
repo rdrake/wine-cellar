@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { api } from "@/api";
+import { useAuth } from "@/components/AuthGate";
 import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
 import { GravitySparkline } from "@/components/Sparkline";
@@ -355,6 +356,7 @@ function NotificationsSection() {
 // ── Account ──────────────────────────────────────────────────────────
 
 function AccountSection() {
+  const { user } = useAuth();
   const [registering, setRegistering] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -385,15 +387,28 @@ function AccountSection() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        {user.avatarUrl && (
+          <img src={user.avatarUrl} alt="" className="h-10 w-10 rounded-full" />
+        )}
         <div>
-          <p className="text-sm">Passkeys</p>
-          <p className="text-xs text-muted-foreground">Add a passkey for another device.</p>
+          <p className="font-medium">{user.name ?? user.email}</p>
+          <p className="text-sm text-muted-foreground">{user.email}</p>
         </div>
-        <Button size="sm" variant="outline" disabled={registering} onClick={handleRegisterPasskey}>
-          {registering ? "Registering..." : "Add Passkey"}
-        </Button>
       </div>
+
+      <div className="pt-3 border-t">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm">Passkeys</p>
+            <p className="text-xs text-muted-foreground">Add a passkey for another device.</p>
+          </div>
+          <Button size="sm" variant="outline" disabled={registering} onClick={handleRegisterPasskey}>
+            {registering ? "Registering..." : "Add Passkey"}
+          </Button>
+        </div>
+      </div>
+
       <div className="pt-2 border-t">
         <Button size="sm" variant="ghost" className="text-destructive" disabled={loggingOut} onClick={handleLogout}>
           {loggingOut ? "Logging out..." : "Log Out"}

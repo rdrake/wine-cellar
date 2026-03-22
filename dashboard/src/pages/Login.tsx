@@ -1,44 +1,82 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { api } from "@/api";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
-export default function Login({ onComplete }: { onComplete: () => void }) {
-  const [loading, setLoading] = useState(false);
+export function Login() {
   const [error, setError] = useState<string | null>(null);
+  const [registrationsOpen, setRegistrationsOpen] = useState(true);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
 
-  async function handleLogin() {
-    setLoading(true);
+  useEffect(() => {
+    // Check URL for error params from OAuth redirect
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get("error");
+    if (errorParam === "registrations_closed") {
+      setError("Registrations are currently closed.");
+    } else if (errorParam === "github_error") {
+      setError("GitHub sign-in failed. Please try again.");
+    } else if (errorParam === "email_required") {
+      setError("A verified email address is required.");
+    }
+    // Clear error params from URL
+    if (errorParam) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+
+    api.auth.settings().then((s) => setRegistrationsOpen(s.registrationsOpen)).catch(() => {});
+  }, []);
+
+  const handlePasskeyLogin = async () => {
+    setPasskeyLoading(true);
     setError(null);
     try {
       const { challengeId, options } = await api.auth.loginOptions();
       const credential = await startAuthentication({ optionsJSON: options });
       await api.auth.login({ challengeId, credential });
-      onComplete();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Sign in failed";
-      setError(msg);
-      toast.error(msg);
+      window.location.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Passkey login failed");
     } finally {
-      setLoading(false);
+      setPasskeyLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm space-y-6 text-center">
-        <div>
-          <h1 className="font-heading text-2xl tracking-tight text-primary">Wine Cellar</h1>
-          <p className="text-sm text-muted-foreground mt-1">Sign in to continue</p>
-        </div>
-        <Button className="w-full" disabled={loading} onClick={handleLogin}>
-          {loading ? "Signing in..." : "Sign in with Passkey"}
-        </Button>
-        {error && (
-          <p className="text-sm text-destructive">{error}</p>
-        )}
-      </div>
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Wine Cellar</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <a href="/api/v1/auth/github" className={cn(buttonVariants({ size: "lg" }), "w-full")}>
+            Sign in with GitHub
+          </a>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+
+          <Button variant="outline" size="lg" className="w-full" onClick={handlePasskeyLogin} disabled={passkeyLoading}>
+            {passkeyLoading ? "Waiting for passkey…" : "Sign in with Passkey"}
+          </Button>
+
+          {!registrationsOpen && (
+            <p className="text-center text-sm text-muted-foreground">New signups are currently closed</p>
+          )}
+
+          {error && (
+            <p className="text-center text-sm text-destructive">{error}</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
