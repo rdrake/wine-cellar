@@ -7,9 +7,9 @@ compatibility_date = "2025-11-02"
 mode = "smart"
 
 [vars]
-GITHUB_CLIENT_ID = ""
-RP_ID = "wine-cellar-dashboard.pages.dev"
-RP_ORIGIN = "https://wine-cellar-dashboard.pages.dev"
+GITHUB_CLIENT_ID = "Ov23li1cmE2dJlzHda5X"
+RP_ID = "cellar.drake.zone"
+RP_ORIGIN = "https://cellar.drake.zone"
 
 [[d1_databases]]
 binding = "DB"
