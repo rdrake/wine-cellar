@@ -4,6 +4,15 @@ import type {
   Reading, Device,
   ListResponse, PaginatedResponse, DashboardResponse,
 } from "./types";
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/browser";
+
+let onUnauthorized: (() => void) | null = null;
+export function setOnUnauthorized(cb: () => void) {
+  onUnauthorized = cb;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -35,9 +44,8 @@ async function apiFetch<T>(path: string, options: { method?: string; body?: unkn
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  // 401 means Access session expired — reload triggers Access login
   if (res.status === 401) {
-    window.location.reload();
+    onUnauthorized?.();
     throw new ApiError(401, { error: "unauthorized", message: "Session expired" });
   }
 
@@ -113,6 +121,24 @@ export const api = {
       apiFetch<{ status: string }>("/api/v1/push/subscribe", { method: "DELETE", body: { endpoint } }),
     test: () =>
       apiFetch<{ status: string }>("/api/v1/push/test", { method: "POST" }),
+  },
+  auth: {
+    status: () =>
+      apiFetch<{ registered: boolean; authenticated: boolean }>("/api/v1/auth/status"),
+    bootstrapOptions: (data: { setupToken: string; email: string }) =>
+      apiFetch<{ challengeId: string; options: PublicKeyCredentialCreationOptionsJSON }>("/api/v1/auth/bootstrap/options", { method: "POST", body: data }),
+    bootstrap: (data: { challengeId: string; credential: unknown; setupToken: string; email: string }) =>
+      apiFetch<{ status: string }>("/api/v1/auth/bootstrap", { method: "POST", body: data }),
+    loginOptions: () =>
+      apiFetch<{ challengeId: string; options: PublicKeyCredentialRequestOptionsJSON }>("/api/v1/auth/login/options", { method: "POST" }),
+    login: (data: { challengeId: string; credential: unknown }) =>
+      apiFetch<{ status: string }>("/api/v1/auth/login", { method: "POST", body: data }),
+    registerOptions: () =>
+      apiFetch<{ challengeId: string; options: PublicKeyCredentialCreationOptionsJSON }>("/api/v1/auth/register/options", { method: "POST" }),
+    register: (data: { challengeId: string; credential: unknown }) =>
+      apiFetch<{ status: string }>("/api/v1/auth/register", { method: "POST", body: data }),
+    logout: () =>
+      apiFetch<{ status: string }>("/api/v1/auth/logout", { method: "POST" }),
   },
   dashboard: () => apiFetch<DashboardResponse>("/api/v1/dashboard"),
   health: () => apiFetch<{ status: string }>("/health"),

@@ -1,5 +1,4 @@
 import { Outlet } from "react-router-dom";
-import { Toaster } from "@/components/ui/sonner";
 import BottomNav from "./BottomNav";
 import ThemeToggle from "./ThemeToggle";
 
@@ -12,7 +11,6 @@ export default function Layout() {
       </header>
       <Outlet />
       <BottomNav />
-      <Toaster position="top-center" style={{ top: "env(safe-area-inset-top, 0px)" }} />
     </div>
   );
 }
