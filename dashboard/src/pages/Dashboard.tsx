@@ -137,7 +137,7 @@ function BatchRow({ batch }: { batch: BatchSummary & { _stalled?: boolean } }) {
   const att = og && sg ? attenuation(og, sg) : null;
   const gravities = batch.sparkline.map((p) => p.g);
   const temps = batch.sparkline
-    .map((p) => (p as any).temp as number | null)
+    .map((p) => p.temp)
     .filter((t): t is number => t != null);
 
   return (
@@ -209,6 +209,7 @@ function BatchRow({ batch }: { batch: BatchSummary & { _stalled?: boolean } }) {
 
 function activityPreview(activity: Activity & { batch_name: string }): string | null {
   if (!activity.details) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- loosely-typed JSON blob from API
   const d = activity.details as Record<string, any>;
   switch (activity.type) {
     case "addition": {

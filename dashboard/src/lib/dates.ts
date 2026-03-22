@@ -4,7 +4,7 @@ import { formatDistanceToNow, parseISO } from "date-fns";
  * Parse a date string that may or may not have a timezone suffix.
  * SQLite datetime('now') returns "2026-03-22 13:41:01" without Z — treat as UTC.
  */
-function parseUtc(dateStr: string): Date {
+export function parseUtc(dateStr: string): Date {
   if (dateStr.endsWith("Z") || dateStr.includes("+")) return parseISO(dateStr);
   // Bare date "2026-03-28" needs full ISO suffix; datetime "2026-03-28 13:00:00" just needs Z
   if (dateStr.includes("T") || dateStr.includes(" ")) return parseISO(dateStr + "Z");

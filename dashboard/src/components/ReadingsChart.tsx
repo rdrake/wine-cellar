@@ -49,12 +49,14 @@ export default function ReadingsChart({ readings, activities, batchStartedAt, lo
 
   const batchStart = batchStartedAt ? toEpoch(batchStartedAt) : null;
 
+  const [now] = useState(() => Date.now());
+
   const filtered = useMemo(() => {
     if (range === "all") return readings;
     const days = range === "7d" ? 7 : 14;
-    const cutoff = Date.now() - days * 86400000;
+    const cutoff = now - days * 86400000;
     return readings.filter((r) => toEpoch(r.source_timestamp) > cutoff);
-  }, [readings, range]);
+  }, [readings, range, now]);
 
   const all = filtered;
 

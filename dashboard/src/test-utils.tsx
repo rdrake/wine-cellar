@@ -2,11 +2,14 @@
  * Shared test utilities for dashboard tests.
  *
  * Re-exports @testing-library/react and provides:
- * - renderWithAuth(): renders a component with a mocked AuthGate context
  * - makeUser(): builds a test user with optional overrides
- * - Common mock factories for API responses
+ * - mockAuthModule / mockApiModule: factories for vi.mock() calls
+ * - renderWithRouter(): renders inside a MemoryRouter
  */
+import { render } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
+import type { ReactElement } from "react";
 
 // ── Test user factory ─────────────────────────────────────────────────
 
@@ -31,7 +34,6 @@ export function makeUser(overrides: Partial<TestUser> = {}): TestUser {
 
 /**
  * Call this inside vi.mock("@/components/AuthGate", ...) to get a mock useAuth.
- * Pass `user` and `isNewUser` to customize per-test.
  */
 export function mockAuthModule(
   user: TestUser = makeUser(),
@@ -47,15 +49,28 @@ export function mockAuthModule(
 }
 
 /**
- * Returns a mock `api` object with all endpoints resolving to empty lists.
+ * Returns a mock `api` object with all endpoints resolving to empty data.
  * Override individual methods per-test via vi.mocked().
  */
 export function mockApiModule() {
   return {
     api: {
+      dashboard: vi.fn().mockResolvedValue({ active_batches: [], recent_activities: [], alerts: [] }),
       devices: { list: vi.fn().mockResolvedValue({ items: [] }) },
-      batches: { list: vi.fn().mockResolvedValue({ items: [] }) },
-      readings: { listByDevice: vi.fn().mockResolvedValue({ items: [], next_cursor: null }) },
+      batches: {
+        list: vi.fn().mockResolvedValue({ items: [] }),
+        get: vi.fn().mockResolvedValue(null),
+      },
+      readings: {
+        listByBatch: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
+        listByDevice: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
+      },
+      activities: {
+        list: vi.fn().mockResolvedValue({ items: [] }),
+      },
+      alerts: {
+        dismiss: vi.fn().mockResolvedValue({}),
+      },
       auth: {
         passkeys: { list: vi.fn().mockResolvedValue({ items: [] }) },
         apiKeys: { list: vi.fn().mockResolvedValue({ items: [] }) },
@@ -66,6 +81,12 @@ export function mockApiModule() {
       },
     },
   };
+}
+
+// ── Render helpers ────────────────────────────────────────────────────
+
+export function renderWithRouter(ui: ReactElement, { route = "/" }: { route?: string } = {}) {
+  return render(<MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>);
 }
 
 // ── Re-exports for convenience ────────────────────────────────────────
