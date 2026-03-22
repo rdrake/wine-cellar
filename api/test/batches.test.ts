@@ -120,3 +120,95 @@ describe("batches CRUD", () => {
     expect(status).toBe(404);
   });
 });
+
+describe("winemaking metadata", () => {
+  it("creates batch with winemaking fields", async () => {
+    const { status, json } = await fetchJson("/api/v1/batches", {
+      method: "POST",
+      headers: API_HEADERS,
+      body: {
+        ...VALID_BATCH,
+        yeast_strain: "EC-1118",
+        oak_type: "french",
+        oak_format: "barrel",
+        oak_duration_days: 180,
+        mlf_status: "pending",
+      },
+    });
+    expect(status).toBe(201);
+    expect(json.yeast_strain).toBe("EC-1118");
+    expect(json.oak_type).toBe("french");
+    expect(json.oak_format).toBe("barrel");
+    expect(json.oak_duration_days).toBe(180);
+    expect(json.mlf_status).toBe("pending");
+  });
+
+  it("updates winemaking fields via PATCH", async () => {
+    const batchId = await createBatch();
+    const { status, json } = await fetchJson(`/api/v1/batches/${batchId}`, {
+      method: "PATCH",
+      headers: API_HEADERS,
+      body: {
+        yeast_strain: "D47",
+        oak_type: "american",
+        oak_format: "chips",
+        oak_duration_days: 30,
+        mlf_status: "in_progress",
+      },
+    });
+    expect(status).toBe(200);
+    expect(json.yeast_strain).toBe("D47");
+    expect(json.oak_type).toBe("american");
+    expect(json.oak_format).toBe("chips");
+    expect(json.oak_duration_days).toBe(30);
+    expect(json.mlf_status).toBe("in_progress");
+  });
+
+  it("rejects invalid oak_type", async () => {
+    const { status } = await fetchJson("/api/v1/batches", {
+      method: "POST",
+      headers: API_HEADERS,
+      body: { ...VALID_BATCH, oak_type: "bamboo" },
+    });
+    expect(status).toBe(422);
+  });
+
+  it("rejects invalid mlf_status", async () => {
+    const { status } = await fetchJson("/api/v1/batches", {
+      method: "POST",
+      headers: API_HEADERS,
+      body: { ...VALID_BATCH, mlf_status: "unknown" },
+    });
+    expect(status).toBe(422);
+  });
+
+  it("sets bottled_at when completing from bottling stage", async () => {
+    const batchId = await createBatch();
+    // Advance through all stages to bottling
+    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers: API_HEADERS });
+    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers: API_HEADERS });
+    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers: API_HEADERS });
+    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers: API_HEADERS });
+
+    // Verify we're at bottling
+    const { json: batch } = await fetchJson(`/api/v1/batches/${batchId}`, { headers: API_HEADERS });
+    expect(batch.stage).toBe("bottling");
+
+    // Complete from bottling
+    const { json: completed } = await fetchJson(`/api/v1/batches/${batchId}/complete`, {
+      method: "POST",
+      headers: API_HEADERS,
+    });
+    expect(completed.bottled_at).toBeTruthy();
+  });
+
+  it("does NOT set bottled_at when completing from non-bottling stage", async () => {
+    const batchId = await createBatch();
+    // Complete from must_prep (initial stage)
+    const { json: completed } = await fetchJson(`/api/v1/batches/${batchId}/complete`, {
+      method: "POST",
+      headers: API_HEADERS,
+    });
+    expect(completed.bottled_at).toBeNull();
+  });
+});

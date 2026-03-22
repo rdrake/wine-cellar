@@ -26,11 +26,14 @@ batches.post("/", async (c) => {
   await db
     .prepare(
       `INSERT INTO batches (id, user_id, name, wine_type, source_material, stage, status,
-       volume_liters, target_volume_liters, target_gravity, started_at, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 'must_prep', 'active', ?, ?, ?, ?, ?, ?, ?)`
+       volume_liters, target_volume_liters, target_gravity,
+       yeast_strain, oak_type, oak_format, oak_duration_days, mlf_status,
+       started_at, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'must_prep', 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(id, user.id, b.name, b.wine_type, b.source_material,
       b.volume_liters ?? null, b.target_volume_liters ?? null, b.target_gravity ?? null,
+      b.yeast_strain ?? null, b.oak_type ?? null, b.oak_format ?? null, b.oak_duration_days ?? null, b.mlf_status ?? null,
       b.started_at, b.notes ?? null, now, now)
     .run();
 
@@ -99,7 +102,8 @@ batches.patch("/:batchId", async (c) => {
     }
   }
 
-  const allowedCols = ["name", "notes", "volume_liters", "target_volume_liters", "target_gravity", "status"] as const;
+  const allowedCols = ["name", "notes", "volume_liters", "target_volume_liters", "target_gravity",
+    "yeast_strain", "oak_type", "oak_format", "oak_duration_days", "mlf_status", "status"] as const;
   const updates: Record<string, unknown> = {};
   for (const col of allowedCols) {
     if (parsed.data[col] !== undefined) {
@@ -113,6 +117,9 @@ batches.patch("/:batchId", async (c) => {
     await unassignDevices(db, batchId, now);
     if (parsed.data.status === "completed") {
       updates.completed_at = now;
+      if (row.stage === "bottling") {
+        updates.bottled_at = now;
+      }
     }
   }
   // If reopening, clear completed_at
@@ -230,8 +237,9 @@ batches.post("/:batchId/complete", async (c) => {
   if (row.status !== "active") return conflict("Only active batches can be completed");
 
   const now = nowUtc();
-  await db.prepare("UPDATE batches SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ? AND user_id = ?")
-    .bind(now, now, batchId, c.get("user").id).run();
+  const bottledAt = row.stage === "bottling" ? now : null;
+  await db.prepare("UPDATE batches SET status = 'completed', completed_at = ?, bottled_at = COALESCE(?, bottled_at), updated_at = ? WHERE id = ? AND user_id = ?")
+    .bind(now, bottledAt, now, batchId, c.get("user").id).run();
   await unassignDevices(db, batchId, now);
   return c.json(await getOwnedBatch(db, batchId, c.get("user").id));
 });

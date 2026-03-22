@@ -6,6 +6,9 @@ import {
   ALL_STAGES,
   BATCH_STAGES,
   ACTIVITY_TYPES,
+  OAK_TYPES,
+  OAK_FORMATS,
+  MLF_STATUSES,
 } from "./schema";
 
 // --- Request Schemas ---
@@ -18,6 +21,11 @@ export const BatchCreateSchema = z.object({
   volume_liters: z.number().nullable().optional(),
   target_volume_liters: z.number().nullable().optional(),
   target_gravity: z.number().nullable().optional(),
+  yeast_strain: z.string().nullable().optional(),
+  oak_type: z.enum(OAK_TYPES).nullable().optional(),
+  oak_format: z.enum(OAK_FORMATS).nullable().optional(),
+  oak_duration_days: z.number().int().nullable().optional(),
+  mlf_status: z.enum(MLF_STATUSES).nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 export type BatchCreate = z.infer<typeof BatchCreateSchema>;
@@ -28,6 +36,11 @@ export const BatchUpdateSchema = z.object({
   volume_liters: z.number().nullable().optional(),
   target_volume_liters: z.number().nullable().optional(),
   target_gravity: z.number().nullable().optional(),
+  yeast_strain: z.string().nullable().optional(),
+  oak_type: z.enum(OAK_TYPES).nullable().optional(),
+  oak_format: z.enum(OAK_FORMATS).nullable().optional(),
+  oak_duration_days: z.number().int().nullable().optional(),
+  mlf_status: z.enum(MLF_STATUSES).nullable().optional(),
   status: z.enum(BATCH_STATUSES).optional(),
 });
 export type BatchUpdate = z.infer<typeof BatchUpdateSchema>;
