@@ -411,7 +411,7 @@ export default function BatchDetail() {
 
           {/* Projected timeline for active batches */}
           {batch.status === "active" && batch.timeline && batch.timeline.length > 0 && (
-            <BatchTimeline milestones={batch.timeline} />
+            <BatchTimeline milestones={batch.timeline} currentPhase={batch.currentPhase} />
           )}
 
           {/* 4. Primary actions — promoted */}
