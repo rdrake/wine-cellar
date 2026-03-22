@@ -49,14 +49,14 @@ export const ActivityCreateSchema = z.object({
   stage: z.enum(ALL_STAGES),
   type: z.enum(ACTIVITY_TYPES),
   title: z.string().min(1).max(200),
-  details: z.record(z.unknown()).nullable().default(null),
+  details: z.record(z.string(), z.unknown()).nullable().default(null),
   recorded_at: z.string().max(100),
 });
 export type ActivityCreate = z.infer<typeof ActivityCreateSchema>;
 
 export const ActivityUpdateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
-  details: z.record(z.unknown()).nullable().optional(),
+  details: z.record(z.string(), z.unknown()).nullable().optional(),
   recorded_at: z.string().max(100).optional(),
 });
 export type ActivityUpdate = z.infer<typeof ActivityUpdateSchema>;

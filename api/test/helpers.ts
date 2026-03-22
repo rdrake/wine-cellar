@@ -33,22 +33,40 @@ export const VALID_BATCH = {
   notes: "First attempt",
 };
 
+let schemaApplied = false;
+
 export async function applyMigrations() {
-  const sql = (env as any).MIGRATION_SQL as string;
-  const cleaned = sql
-    .split("\n")
-    .filter((line: string) => {
-      const trimmed = line.trim();
-      return !trimmed.startsWith("--");
-    })
-    .join("\n");
-  const statements = cleaned
-    .split(";")
-    .map((s: string) => s.trim())
-    .filter((s: string) => s.length > 0);
-  for (const stmt of statements) {
-    await env.DB.prepare(stmt).run();
+  // D1 persists across tests in vitest-pool-workers 0.13+.
+  // Run migrations once per worker, then just clear data between tests.
+  if (!schemaApplied) {
+    const sql = (env as any).MIGRATION_SQL as string;
+    const cleaned = sql
+      .split("\n")
+      .filter((line: string) => !line.trim().startsWith("--"))
+      .join("\n");
+    const statements = cleaned
+      .split(";")
+      .map((s: string) => s.trim())
+      .filter((s: string) => s.length > 0);
+    for (const stmt of statements) {
+      await env.DB.prepare(stmt).run();
+    }
+    schemaApplied = true;
   }
+
+  // Clear all data — FK-safe order (children before parents)
+  const tables = [
+    "alert_state", "push_subscriptions", "api_keys",
+    "auth_sessions", "auth_challenges", "oauth_accounts", "passkey_credentials",
+    "activities", "readings", "devices",
+    "batches", "users", "settings",
+  ];
+  await env.DB.batch(tables.map((t) => env.DB.prepare(`DELETE FROM "${t}"`)));
+
+  // Re-seed default settings row (migration 0009 inserts it, but DELETE clears it)
+  await env.DB.prepare(
+    "INSERT INTO settings (key, value) VALUES ('registrations_open', 'true')",
+  ).run();
 }
 
 export async function fetchJson(
