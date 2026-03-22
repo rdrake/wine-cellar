@@ -191,6 +191,47 @@ describe("winemaking nudges", () => {
     });
   });
 
+  describe("so2-mlf-warning", () => {
+    it("warns when MLF is in progress during secondary fermentation", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "secondary_fermentation", wineType: "red", mlfStatus: "in_progress" })
+      );
+      const nudge = findNudge(nudges, "so2-mlf-warning");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.priority).toBe("warning");
+      expect(nudge!.message).toContain("SO2");
+      expect(nudge!.message).toContain("MLF");
+    });
+
+    it("warns when MLF is in progress during stabilization", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "stabilization", wineType: "red", mlfStatus: "in_progress" })
+      );
+      expect(findNudge(nudges, "so2-mlf-warning")).not.toBeNull();
+    });
+
+    it("does not warn when MLF is complete", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "secondary_fermentation", wineType: "red", mlfStatus: "complete" })
+      );
+      expect(findNudge(nudges, "so2-mlf-warning")).toBeNull();
+    });
+
+    it("does not warn when MLF is not planned", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "secondary_fermentation", wineType: "red", mlfStatus: "not_planned" })
+      );
+      expect(findNudge(nudges, "so2-mlf-warning")).toBeNull();
+    });
+
+    it("does not warn when mlfStatus is null", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "secondary_fermentation", wineType: "red", mlfStatus: null })
+      );
+      expect(findNudge(nudges, "so2-mlf-warning")).toBeNull();
+    });
+  });
+
   describe("so2-racking", () => {
     it("shows SO2 nudge at stabilization", () => {
       const nudges = generateNudges(

@@ -108,6 +108,17 @@ function mlfSuggestion(ctx: NudgeContext): Nudge | null {
   };
 }
 
+function so2MlfWarning(ctx: NudgeContext): Nudge | null {
+  if (ctx.mlfStatus !== "in_progress") return null;
+
+  return {
+    id: "so2-mlf-warning",
+    priority: "warning",
+    message: "Do not add SO2 while MLF is in progress — it will kill the malolactic bacteria",
+    stage: ctx.stage,
+  };
+}
+
 function so2Racking(ctx: NudgeContext): Nudge | null {
   if (ctx.stage !== "stabilization") return null;
 
@@ -138,6 +149,7 @@ const evaluators: Evaluator[] = [
   tempHighPrimary,
   considerPressing,
   mlfSuggestion,
+  so2MlfWarning,
   so2Racking,
   bottlingChecklist,
 ];
