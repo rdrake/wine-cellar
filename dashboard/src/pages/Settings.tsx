@@ -775,6 +775,10 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      <p className="text-xs text-muted-foreground text-center">
+        Build: {(globalThis as Record<string, unknown>).__BUILD_TIME__ as string}
+      </p>
+
       {assignDialog && (
         <AssignDialog
           device={assignDialog}
