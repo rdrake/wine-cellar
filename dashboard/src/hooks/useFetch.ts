@@ -6,7 +6,7 @@ export function useFetch<T>(fn: () => Promise<T>, deps: unknown[] = []) {
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const fnRef = useRef(fn);
-  fnRef.current = fn;
+  fnRef.current = fn; // eslint-disable-line react-hooks/refs -- intentional sync ref pattern
 
   useEffect(() => {
     let cancelled = false;
