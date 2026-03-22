@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { startRegistration } from "@simplewebauthn/browser";
 import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
@@ -351,6 +352,57 @@ function NotificationsSection() {
   );
 }
 
+// ── Account ──────────────────────────────────────────────────────────
+
+function AccountSection() {
+  const [registering, setRegistering] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleRegisterPasskey() {
+    setRegistering(true);
+    try {
+      const { challengeId, options } = await api.auth.registerOptions();
+      const credential = await startRegistration({ optionsJSON: options });
+      await api.auth.register({ challengeId, credential });
+      toast.success("Passkey registered");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Couldn't register passkey");
+    } finally {
+      setRegistering(false);
+    }
+  }
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await api.auth.logout();
+      window.location.reload();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Couldn't log out");
+      setLoggingOut(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm">Passkeys</p>
+          <p className="text-xs text-muted-foreground">Add a passkey for another device.</p>
+        </div>
+        <Button size="sm" variant="outline" disabled={registering} onClick={handleRegisterPasskey}>
+          {registering ? "Registering..." : "Add Passkey"}
+        </Button>
+      </div>
+      <div className="pt-2 border-t">
+        <Button size="sm" variant="ghost" className="text-destructive" disabled={loggingOut} onClick={handleLogout}>
+          {loggingOut ? "Logging out..." : "Log Out"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────
 
 export default function Settings() {
@@ -420,6 +472,12 @@ export default function Settings() {
       <section>
         <h2 className="text-sm font-semibold mb-2">Notifications</h2>
         <NotificationsSection />
+      </section>
+
+      {/* Account */}
+      <section>
+        <h2 className="text-sm font-semibold mb-2">Account</h2>
+        <AccountSection />
       </section>
 
       {assignDialog && (
