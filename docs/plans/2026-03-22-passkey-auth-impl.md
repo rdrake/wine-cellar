@@ -61,6 +61,8 @@ CREATE TABLE auth_sessions (
 );
 
 CREATE INDEX idx_auth_sessions_user ON auth_sessions(user_id);
+CREATE INDEX idx_auth_sessions_expires ON auth_sessions(expires_at);
+CREATE INDEX idx_auth_challenges_expires ON auth_challenges(expires_at);
 ```
 
 **Step 2: Install dependencies**
@@ -99,9 +101,11 @@ export type Bindings = {
 };
 ```
 
-Note: `CF_ACCESS_AUD` becomes optional — the middleware will skip JWT verification when it's unset.
+Note: `CF_ACCESS_AUD` becomes optional — the middleware will skip JWT verification when it's unset. The legacy `API_KEY?: string` field is intentionally removed — it was unused in any source code (only in the type).
 
 Also update `AccessBindings` in `api/src/middleware/access.ts` to match (or remove it and import `Bindings` from app.ts).
+
+**Important:** When CF Access is disabled in production and `CF_ACCESS_AUD` is unset, the JWT fallback path is skipped entirely. This does NOT affect service token access because the webhook endpoint (the only service-token consumer for RAPT Pill data ingestion) bypasses auth middleware entirely via the `/webhook` exempt path.
 
 **Step 5: Update vitest config**
 
@@ -116,10 +120,12 @@ bindings: {
   VAPID_PRIVATE_KEY: "test-vapid-private-key",
   SETUP_TOKEN: "test-setup-token",
   RP_ID: "localhost",
-  RP_ORIGIN: "http://localhost",
+  RP_ORIGIN: "http://localhost",  // Matches SELF.fetch test origin
   MIGRATION_SQL: migrationSql,
 },
 ```
+
+Note: `RP_ORIGIN` is set to `"http://localhost"` because `SELF.fetch()` in the test pool sends requests to `http://localhost`. This value is only used by `verifyRegistrationResponse`/`verifyAuthenticationResponse` for origin checking — since the plan's API tests don't exercise full WebAuthn verification (the browser-side credential creation can't be simulated in Workers), this binding is used mainly to verify the options endpoints return the correct `rpId`.
 
 **Step 6: Add env vars to wrangler.toml**
 
@@ -494,7 +500,7 @@ describe("auth middleware", () => {
     const { status, json } = await fetchJson("/api/v1/me", {
       headers: {
         Cookie: `session=${token}`,
-        "Cf-Access-Jwt-Assertion": authHeaders().["Cf-Access-Jwt-Assertion"],
+        "Cf-Access-Jwt-Assertion": authHeaders()["Cf-Access-Jwt-Assertion"],
       },
     });
     expect(status).toBe(200);
@@ -503,7 +509,6 @@ describe("auth middleware", () => {
 });
 ```
 
-Fix the syntax error in the last test (`authHeaders().["Cf-Access-Jwt-Assertion"]` should be `authHeaders()["Cf-Access-Jwt-Assertion"]`).
 
 **Step 2: Run tests to verify they fail**
 
@@ -778,10 +783,9 @@ Expected: FAIL — routes don't exist yet.
 
 **Step 4: Implement auth routes**
 
-Create `api/src/routes/auth.ts`. Key implementation notes:
+Create `api/src/routes/auth.ts` as a `Hono<AppEnv>` instance. The file contains all auth routes (status, bootstrap, login, register, logout will be added in later tasks).
 
-- Import `generateRegistrationOptions` from `@simplewebauthn/server`.
-- The `constantTimeEqual` function uses double-HMAC for timing-safe comparison:
+**Constant-time comparison helper** (put at top of file):
 
 ```typescript
 async function constantTimeEqual(a: string, b: string): Promise<boolean> {
@@ -802,18 +806,49 @@ async function constantTimeEqual(a: string, b: string): Promise<boolean> {
 }
 ```
 
-- The route file should be a `Hono<AppEnv>` instance with all auth routes.
-- `GET /status`: check `passkey_credentials` count → `registered`; check session cookie or JWT → `authenticated`.
-- `POST /bootstrap/options`: validate setup token (constant-time), check no credentials exist, look up user by email, generate registration options, store challenge, return `{ challengeId, options }`.
-- `POST /bootstrap`: validate setup token again, check no credentials exist, look up user, consume challenge, call `verifyRegistrationResponse`, store credential in `passkey_credentials`, create session, set cookie, return `{ status: "ok" }`.
+**`GET /status` implementation** — this is an unauthenticated route (exempt from middleware), so `c.get("user")` is NOT available. It must check auth state independently:
 
-For `verifyRegistrationResponse`, the credential's `publicKey` is a `Uint8Array` that maps to BLOB in D1. The credential's `id` is already a base64url string.
+```typescript
+auth.get("/status", async (c) => {
+  const db = c.env.DB;
 
-The `webauthn_user_id` is generated during `/bootstrap/options` and must be passed through to `/bootstrap`. Since both endpoints receive the email, you can either:
-- Store the webauthnUserId in the challenge record (add it to the response from /options and require it in /bootstrap body)
-- Or generate it in /bootstrap/options, return it to the client, and have the client send it back in /bootstrap
+  // Check if any credentials are registered
+  const credCount = await db
+    .prepare("SELECT COUNT(*) as count FROM passkey_credentials")
+    .first<{ count: number }>();
+  const registered = (credCount?.count ?? 0) > 0;
 
-The design uses the second approach (client round-trips the `webauthnUserId`).
+  // Check if caller is authenticated (session cookie or CF Access JWT)
+  let authenticated = false;
+
+  const sessionToken = getSessionToken(c);
+  if (sessionToken) {
+    const userId = await validateSession(db, sessionToken);
+    authenticated = !!userId;
+  }
+
+  // CF Access JWT fallback (recovery path)
+  if (!authenticated) {
+    const jwt = c.req.header("Cf-Access-Jwt-Assertion");
+    if (jwt && c.env.CF_ACCESS_AUD) {
+      const result = await verifyAccessJwt(jwt, c.env.CF_ACCESS_AUD, c.env.CF_ACCESS_TEAM);
+      authenticated = !!result;
+    }
+  }
+
+  return c.json({ registered, authenticated });
+});
+```
+
+**`POST /bootstrap/options`** — validates setup token (constant-time), checks no credentials exist, looks up user by email, generates registration options, stores challenge. Returns `{ challengeId, options }`.
+
+**`POST /bootstrap`** — validates setup token again, checks no credentials exist, looks up user, consumes challenge, calls `verifyRegistrationResponse`, stores credential, creates session, sets cookie. Returns `{ status: "ok" }`.
+
+Key details:
+- Import `generateRegistrationOptions`, `verifyRegistrationResponse` from `@simplewebauthn/server`.
+- For `verifyRegistrationResponse`, the credential's `publicKey` is a `Uint8Array` that maps to BLOB in D1. The credential's `id` is already a base64url string.
+- The `webauthn_user_id` is generated in `/bootstrap/options` as `crypto.getRandomValues(new Uint8Array(64))`, returned to the client as base64url, and round-tripped back in the `/bootstrap` request body. Store it in `passkey_credentials.webauthn_user_id`.
+- After successful bootstrap, verify the response sets a session cookie by checking the `Set-Cookie` header contains `session=`.
 
 **Step 5: Mount auth routes in app.ts**
 
@@ -1042,12 +1077,47 @@ async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
 },
 ```
 
-**Step 5: Run tests**
+**Step 5: Write cron cleanup test**
+
+Add to `api/test/auth.test.ts`:
+
+```typescript
+describe("auth cron cleanup", () => {
+  beforeEach(async () => { await applyMigrations(); });
+
+  it("removes expired sessions and challenges", async () => {
+    const { token, userId } = await seedSession();
+
+    // Expire the session
+    const hash = await hashToken(token);
+    await env.DB.prepare("UPDATE auth_sessions SET expires_at = datetime('now', '-1 hour') WHERE id = ?")
+      .bind(hash).run();
+
+    // Create an expired challenge
+    await env.DB.prepare(
+      "INSERT INTO auth_challenges (id, challenge, type, expires_at) VALUES ('c1', 'ch', 'login', datetime('now', '-1 hour'))"
+    ).run();
+
+    // Import and run cleanup
+    const { cleanupAuthTables } = await import("../src/cron");
+    await cleanupAuthTables(env.DB);
+
+    const sessions = await env.DB.prepare("SELECT COUNT(*) as count FROM auth_sessions").first<{ count: number }>();
+    const challenges = await env.DB.prepare("SELECT COUNT(*) as count FROM auth_challenges").first<{ count: number }>();
+    expect(sessions!.count).toBe(0);
+    expect(challenges!.count).toBe(0);
+  });
+});
+```
+
+Import `hashToken` from `../src/lib/auth-session` in the test file (or re-export via helpers).
+
+**Step 6: Run tests**
 
 Run: `cd api && npm run test`
 Expected: All PASS.
 
-**Step 6: Commit**
+**Step 7: Commit**
 
 ```bash
 git add api/src/routes/auth.ts api/src/cron.ts api/src/index.ts api/test/auth.test.ts
@@ -1317,7 +1387,7 @@ export default function Login({ onComplete }: { onComplete: () => void }) {
           <p className="text-sm text-muted-foreground mt-1">Sign in to continue</p>
         </div>
         <Button className="w-full" disabled={loading} onClick={handleLogin}>
-          {loading ? "Signing in..." : "Sign in with Face ID"}
+          {loading ? "Signing in..." : "Sign in with Passkey"}
         </Button>
         {error && (
           <p className="text-sm text-destructive">{error}</p>
@@ -1477,9 +1547,23 @@ After all tasks are complete, verify:
 2. `cd api && npm run lint` — no type errors
 3. `cd dashboard && npm run build` — builds cleanly
 4. `cd dashboard && npm run test` — all tests pass
-5. Manual test: run `cd api && npm run dev` and `cd dashboard && npm run dev`, then:
-   - App loads at http://localhost:5173 → shows Setup page
-   - Enter email + setup token → Face ID/Touch ID prompt → lands on dashboard
-   - Close tab, reopen → shows Login page → Face ID → dashboard
-   - Settings → Add Passkey → registers second passkey
-   - Settings → Log Out → returns to Login page
+5. Manual test with local dev proxy:
+   - The dashboard Vite dev server needs a proxy to forward `/api/*` to the API Worker on port 8787. Add to `dashboard/vite.config.ts` if not already present:
+     ```typescript
+     server: {
+       proxy: {
+         "/api": "http://localhost:8787",
+         "/webhook": "http://localhost:8787",
+         "/health": "http://localhost:8787",
+       },
+     },
+     ```
+   - Run `cd api && npm run dev` and `cd dashboard && npm run dev`, then:
+     - App loads at http://localhost:5173 → shows Setup page
+     - Enter email + setup token → biometric prompt → lands on dashboard
+     - Close tab, reopen → shows Login page → biometric → dashboard
+     - Settings → Add Passkey → registers second passkey
+     - Settings → Log Out → returns to Login page
+   - Verify that the `Set-Cookie` header from login/bootstrap responses is correctly received by the browser (check DevTools → Application → Cookies)
+
+**Note on Pages Functions proxy:** In production, all API requests go through `dashboard/functions/api/[[path]].ts`, which creates a new `Request` and forwards it to the API Worker. `Set-Cookie` response headers pass through this proxy unchanged since it returns the raw `fetch()` response.
