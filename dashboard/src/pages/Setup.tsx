@@ -15,7 +15,7 @@ export default function Setup({ onComplete }: { onComplete: () => void }) {
     if (!email.trim() || !setupToken.trim()) return;
     setLoading(true);
     try {
-      const { challengeId, options } = await api.auth.bootstrapOptions({
+      const { challengeId, options, webauthnUserId } = await api.auth.bootstrapOptions({
         setupToken: setupToken.trim(),
         email: email.trim(),
       });
@@ -25,6 +25,7 @@ export default function Setup({ onComplete }: { onComplete: () => void }) {
         credential,
         setupToken: setupToken.trim(),
         email: email.trim(),
+        webauthnUserId,
       });
       toast.success("Passkey created successfully");
       onComplete();

@@ -126,8 +126,8 @@ export const api = {
     status: () =>
       apiFetch<{ registered: boolean; authenticated: boolean }>("/api/v1/auth/status"),
     bootstrapOptions: (data: { setupToken: string; email: string }) =>
-      apiFetch<{ challengeId: string; options: PublicKeyCredentialCreationOptionsJSON }>("/api/v1/auth/bootstrap/options", { method: "POST", body: data }),
-    bootstrap: (data: { challengeId: string; credential: unknown; setupToken: string; email: string }) =>
+      apiFetch<{ challengeId: string; options: PublicKeyCredentialCreationOptionsJSON; webauthnUserId: string }>("/api/v1/auth/bootstrap/options", { method: "POST", body: data }),
+    bootstrap: (data: { challengeId: string; credential: unknown; setupToken: string; email: string; webauthnUserId: string }) =>
       apiFetch<{ status: string }>("/api/v1/auth/bootstrap", { method: "POST", body: data }),
     loginOptions: () =>
       apiFetch<{ challengeId: string; options: PublicKeyCredentialRequestOptionsJSON }>("/api/v1/auth/login/options", { method: "POST" }),
