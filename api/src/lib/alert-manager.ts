@@ -135,6 +135,12 @@ const ALERT_LABELS: Record<string, string> = {
   temp_high: "High Temperature",
   temp_low: "Low Temperature",
   stage_suggestion: "Stage Suggestion",
+  racking_due_1: "Racking Due",
+  racking_due_2: "Racking Due",
+  racking_due_3: "Racking Due",
+  mlf_check: "MLF Check",
+  bottling_ready: "Bottling Ready",
+  so2_due: "SO2 Due",
 };
 
 export async function sendAlertPushes(

@@ -1,6 +1,9 @@
 // api/src/lib/alerts.ts — Pure alert evaluation engine (no DB, no side effects)
 
-export type AlertType = "stall" | "no_readings" | "temp_high" | "temp_low" | "stage_suggestion";
+export type AlertType =
+  | "stall" | "no_readings" | "temp_high" | "temp_low" | "stage_suggestion"
+  | "racking_due_1" | "racking_due_2" | "racking_due_3"
+  | "mlf_check" | "bottling_ready" | "so2_due";
 
 export interface AlertCandidate {
   type: AlertType;

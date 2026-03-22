@@ -46,6 +46,12 @@ function alertMessage(alert: Alert): string {
     temp_high: "High temperature",
     temp_low: "Low temperature",
     stage_suggestion: "Stage change suggested",
+    racking_due_1: "First racking is due",
+    racking_due_2: "Second racking is due",
+    racking_due_3: "Third racking is due",
+    mlf_check: "Check MLF progress",
+    bottling_ready: "Ready for bottling",
+    so2_due: "SO2 addition due",
   };
   return labels[alert.alert_type] ?? "Needs attention";
 }
@@ -56,6 +62,12 @@ const ALERT_STYLES: Record<string, string> = {
   temp_high: "text-destructive",
   temp_low: "text-blue-600 dark:text-blue-400",
   stage_suggestion: "text-blue-600 dark:text-blue-400",
+  racking_due_1: "text-yellow-600 dark:text-yellow-400",
+  racking_due_2: "text-yellow-600 dark:text-yellow-400",
+  racking_due_3: "text-yellow-600 dark:text-yellow-400",
+  mlf_check: "text-blue-600 dark:text-blue-400",
+  bottling_ready: "text-blue-600 dark:text-blue-400",
+  so2_due: "text-yellow-600 dark:text-yellow-400",
 };
 
 // ── Summary Stats ────────────────────────────────────────────────────
