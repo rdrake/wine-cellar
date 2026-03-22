@@ -1,6 +1,15 @@
 import { evaluateAlerts, type BatchAlertContext } from "./lib/alerts";
 import { processAlerts, resolveCleared, sendAlertPushes } from "./lib/alert-manager";
 import { projectTimeline, evaluateTimelineAlerts, fetchWinemakingActivityContext, computeVelocityPerDay } from "./lib/winemaking";
+import { cleanupExpiredSessions } from "./lib/auth-session";
+import { cleanupExpiredChallenges } from "./lib/auth-challenge";
+
+export async function cleanupAuthTables(db: D1Database): Promise<void> {
+  await Promise.all([
+    cleanupExpiredSessions(db),
+    cleanupExpiredChallenges(db),
+  ]);
+}
 
 export async function evaluateAllBatches(
   db: D1Database,

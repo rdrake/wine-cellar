@@ -10,12 +10,13 @@ import type { AuthenticatorTransportFuture } from "@simplewebauthn/types";
 import { storeChallenge, consumeChallenge } from "../lib/auth-challenge";
 import {
   createSession,
+  deleteSession,
   validateSession,
   getSessionToken,
   setSessionCookie,
+  clearSessionCookie,
 } from "../lib/auth-session";
-import { verifyAccessJwt } from "../lib/access-jwt";
-import { base64UrlEncode } from "../lib/access-jwt";
+import { verifyAccessJwt, base64UrlEncode, base64UrlDecode } from "../lib/access-jwt";
 import { forbidden, unauthorized, notFound } from "../lib/errors";
 
 async function constantTimeEqual(a: string, b: string): Promise<boolean> {
@@ -296,6 +297,140 @@ auth.post("/login", async (c) => {
   const { token } = await createSession(db, storedCred.user_id);
   setSessionCookie(c, token, secure);
 
+  return c.json({ status: "ok" });
+});
+
+// POST /register/options — generate registration options for adding a passkey (requires session)
+auth.post("/register/options", async (c) => {
+  const db = c.env.DB;
+  const user = c.get("user");
+
+  // Look up existing webauthn_user_id and credential IDs for this user
+  const existingCreds = await db
+    .prepare(
+      "SELECT id, webauthn_user_id, transports FROM passkey_credentials WHERE user_id = ?",
+    )
+    .bind(user.id)
+    .all<{ id: string; webauthn_user_id: string; transports: string | null }>();
+
+  // Determine webauthn_user_id — reuse existing or generate new
+  let webauthnUserId: Uint8Array;
+  if (existingCreds.results.length > 0) {
+    const encodedUserId = existingCreds.results[0].webauthn_user_id;
+    webauthnUserId = base64UrlDecode(encodedUserId);
+  } else {
+    // Defensive: shouldn't happen since auth requires a credential, but handle gracefully
+    webauthnUserId = crypto.getRandomValues(new Uint8Array(64));
+  }
+
+  // Build excludeCredentials list
+  const excludeCredentials = existingCreds.results.map((cred) => ({
+    id: cred.id,
+    transports: JSON.parse(
+      cred.transports || "[]",
+    ) as AuthenticatorTransportFuture[],
+  }));
+
+  const options = await generateRegistrationOptions({
+    rpName: "Wine Cellar",
+    rpID: c.env.RP_ID,
+    userName: user.email,
+    userID: webauthnUserId,
+    attestationType: "none",
+    authenticatorSelection: {
+      residentKey: "required",
+      userVerification: "required",
+    },
+    excludeCredentials,
+  });
+
+  const challengeId = await storeChallenge(
+    db,
+    options.challenge,
+    "register",
+    user.id,
+  );
+
+  return c.json({ challengeId, options });
+});
+
+// POST /register — verify registration and store new credential (requires session)
+auth.post("/register", async (c) => {
+  const db = c.env.DB;
+  const user = c.get("user");
+  const body = await c.req.json<{ challengeId: string; credential: any }>();
+
+  // Consume challenge
+  const challengeData = await consumeChallenge(
+    db,
+    body.challengeId,
+    "register",
+  );
+  if (!challengeData) {
+    return unauthorized("Challenge expired or invalid");
+  }
+
+  // Verify challenge was issued for this user
+  if (challengeData.userId !== user.id) {
+    return forbidden("Challenge user mismatch");
+  }
+
+  // Verify registration response
+  const verification = await verifyRegistrationResponse({
+    response: body.credential,
+    expectedChallenge: challengeData.challenge,
+    expectedOrigin: c.env.RP_ORIGIN,
+    expectedRPID: c.env.RP_ID,
+  });
+
+  if (!verification.verified || !verification.registrationInfo) {
+    return unauthorized("Registration verification failed");
+  }
+
+  const { credential, credentialDeviceType, credentialBackedUp } =
+    verification.registrationInfo;
+
+  // Look up existing webauthn_user_id for consistency
+  const existingCred = await db
+    .prepare(
+      "SELECT webauthn_user_id FROM passkey_credentials WHERE user_id = ? LIMIT 1",
+    )
+    .bind(user.id)
+    .first<{ webauthn_user_id: string }>();
+
+  const webauthnUserId =
+    existingCred?.webauthn_user_id ??
+    base64UrlEncode(crypto.getRandomValues(new Uint8Array(64)).buffer);
+
+  // Store credential
+  await db
+    .prepare(
+      `INSERT INTO passkey_credentials (id, user_id, public_key, webauthn_user_id, sign_count, transports, device_type, backed_up)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      credential.id,
+      user.id,
+      credential.publicKey as unknown as ArrayBuffer,
+      webauthnUserId,
+      credential.counter,
+      JSON.stringify(credential.transports ?? []),
+      credentialDeviceType,
+      credentialBackedUp ? 1 : 0,
+    )
+    .run();
+
+  return c.json({ status: "ok" });
+});
+
+// POST /logout — destroy session and clear cookie (requires session)
+auth.post("/logout", async (c) => {
+  const token = getSessionToken(c);
+  if (token) {
+    await deleteSession(c.env.DB, token);
+  }
+  const secure = c.env.RP_ORIGIN.startsWith("https://");
+  clearSessionCookie(c, secure);
   return c.json({ status: "ok" });
 });
 

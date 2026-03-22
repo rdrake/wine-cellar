@@ -10,6 +10,7 @@ import {
   sessionHeaders,
   seedSession,
   seedCredential,
+  hashToken,
   TEST_USER_EMAIL,
 } from "./helpers";
 
@@ -190,5 +191,78 @@ describe("POST /api/v1/auth/bootstrap/options", () => {
     expect(json.options).toBeDefined();
     expect(json.options.rp.id).toBe("localhost");
     expect(json.options.user.name).toBe(TEST_USER_EMAIL);
+  });
+});
+
+describe("POST /api/v1/auth/register/options", () => {
+  it("returns 401 without session", async () => {
+    const { status } = await fetchJson("/api/v1/auth/register/options", {
+      method: "POST",
+    });
+    expect(status).toBe(401);
+  });
+
+  it("returns registration options with valid session", async () => {
+    const { token, userId } = await seedSession();
+    await seedCredential(userId);
+    const { status, json } = await fetchJson("/api/v1/auth/register/options", {
+      method: "POST",
+      headers: sessionHeaders(token),
+    });
+    expect(status).toBe(200);
+    expect(json.challengeId).toBeDefined();
+    expect(json.options).toBeDefined();
+    expect(json.options.excludeCredentials.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("POST /api/v1/auth/logout", () => {
+  it("returns 401 without session", async () => {
+    const { status } = await fetchJson("/api/v1/auth/logout", {
+      method: "POST",
+    });
+    expect(status).toBe(401);
+  });
+
+  it("deletes session and invalidates token", async () => {
+    const { token } = await seedSession();
+    const { status } = await fetchJson("/api/v1/auth/logout", {
+      method: "POST",
+      headers: sessionHeaders(token),
+    });
+    expect(status).toBe(200);
+    // Session should be invalid now
+    const { status: meStatus } = await fetchJson("/api/v1/me", {
+      headers: sessionHeaders(token),
+    });
+    expect(meStatus).toBe(401);
+  });
+});
+
+describe("auth cron cleanup", () => {
+  it("removes expired sessions and challenges", async () => {
+    const { token } = await seedSession();
+    const hash = await hashToken(token);
+    // Expire the session
+    await env.DB.prepare(
+      "UPDATE auth_sessions SET expires_at = datetime('now', '-1 hour') WHERE id = ?",
+    )
+      .bind(hash)
+      .run();
+    // Create an expired challenge
+    await env.DB.prepare(
+      "INSERT INTO auth_challenges (id, challenge, type, expires_at) VALUES ('c1', 'ch', 'login', datetime('now', '-1 hour'))",
+    ).run();
+    // Run cleanup
+    const { cleanupAuthTables } = await import("../src/cron");
+    await cleanupAuthTables(env.DB);
+    const sessions = await env.DB.prepare(
+      "SELECT COUNT(*) as count FROM auth_sessions",
+    ).first<{ count: number }>();
+    const challenges = await env.DB.prepare(
+      "SELECT COUNT(*) as count FROM auth_challenges",
+    ).first<{ count: number }>();
+    expect(sessions!.count).toBe(0);
+    expect(challenges!.count).toBe(0);
   });
 });
