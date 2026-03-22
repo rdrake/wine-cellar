@@ -1,17 +1,18 @@
-export type ChallengeType = "bootstrap" | "login" | "register";
+export type ChallengeType = "oauth" | "login" | "register";
 
 export async function storeChallenge(
   db: D1Database,
   challenge: string,
   type: ChallengeType,
   userId?: string,
+  ttlMinutes: number = 5,
 ): Promise<string> {
   const id = crypto.randomUUID();
   await db
     .prepare(
-      "INSERT INTO auth_challenges (id, challenge, type, user_id, expires_at) VALUES (?, ?, ?, ?, datetime('now', '+5 minutes'))",
+      "INSERT INTO auth_challenges (id, challenge, type, user_id, expires_at) VALUES (?, ?, ?, ?, datetime('now', '+' || ? || ' minutes'))",
     )
-    .bind(id, challenge, type, userId ?? null)
+    .bind(id, challenge, type, userId ?? null, ttlMinutes)
     .run();
   return id;
 }

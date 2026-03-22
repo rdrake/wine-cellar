@@ -3,6 +3,8 @@
  * Uses crypto.subtle — no npm dependencies.
  */
 
+import { base64UrlDecode, base64UrlEncode } from "./encoding";
+
 export interface PushSubscription {
   endpoint: string;
   keys_p256dh: string; // base64url — subscriber's ECDH public key (65 bytes raw)
@@ -18,22 +20,6 @@ export interface PushPayload {
   [key: string]: unknown;
 }
 
-// --- Base64url helpers ---
-
-function b64url(buf: ArrayBuffer | Uint8Array): string {
-  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-  let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function unb64url(str: string): Uint8Array {
-  const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = base64.length % 4 === 0 ? "" : "=".repeat(4 - (base64.length % 4));
-  const binary = atob(base64 + pad);
-  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
-}
-
 // --- VAPID JWT (ES256) ---
 
 async function createVapidJwt(
@@ -43,9 +29,9 @@ async function createVapidJwt(
   privateKeyD: Uint8Array,
 ): Promise<{ authorization: string; cryptoKey: string }> {
   // Import the private key as JWK for signing
-  const x = b64url(publicKeyRaw.slice(1, 33));
-  const y = b64url(publicKeyRaw.slice(33, 65));
-  const d = b64url(privateKeyD);
+  const x = base64UrlEncode(publicKeyRaw.slice(1, 33));
+  const y = base64UrlEncode(publicKeyRaw.slice(33, 65));
+  const d = base64UrlEncode(privateKeyD);
 
   const key = await crypto.subtle.importKey(
     "jwk",
@@ -55,9 +41,9 @@ async function createVapidJwt(
     ["sign"],
   );
 
-  const header = b64url(new TextEncoder().encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const header = base64UrlEncode(new TextEncoder().encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
   const now = Math.floor(Date.now() / 1000);
-  const payload = b64url(
+  const payload = base64UrlEncode(
     new TextEncoder().encode(JSON.stringify({ aud: audience, exp: now + 86400, sub: subject })),
   );
 
@@ -84,8 +70,8 @@ async function createVapidJwt(
     rawSig.set(s.length <= 32 ? s : s.slice(s.length - 32), 64 - Math.min(s.length, 32));
   }
 
-  const token = `${header}.${payload}.${b64url(rawSig)}`;
-  const cryptoKeyHeader = b64url(publicKeyRaw);
+  const token = `${header}.${payload}.${base64UrlEncode(rawSig)}`;
+  const cryptoKeyHeader = base64UrlEncode(publicKeyRaw);
 
   return {
     authorization: `vapid t=${token}, k=${cryptoKeyHeader}`,
@@ -222,8 +208,8 @@ async function sendPush(
   vapidPrivateKeyD: Uint8Array,
 ): Promise<{ ok: boolean; status: number; gone: boolean }> {
   try {
-    const subscriberPubKey = unb64url(sub.keys_p256dh);
-    const authSecret = unb64url(sub.keys_auth);
+    const subscriberPubKey = base64UrlDecode(sub.keys_p256dh);
+    const authSecret = base64UrlDecode(sub.keys_auth);
     const plaintext = new TextEncoder().encode(JSON.stringify(payload));
 
     // Encrypt payload per RFC 8291
@@ -280,8 +266,8 @@ export async function sendPushToUser(
 
   if (subs.results.length === 0) return;
 
-  const pubRaw = unb64url(vapidPublicKey);
-  const privD = unb64url(vapidPrivateKey);
+  const pubRaw = base64UrlDecode(vapidPublicKey);
+  const privD = base64UrlDecode(vapidPrivateKey);
 
   for (const sub of subs.results) {
     const result = await sendPush(sub, payload, pubRaw, privD);
