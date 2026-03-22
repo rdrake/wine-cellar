@@ -15,6 +15,7 @@ export interface BatchAlertContext {
   batchId: string;
   userId: string;
   stage: string;
+  wineType: string;
   targetGravity: number | null;
   hasAssignedDevice: boolean;
   readings: { gravity: number; temperature: number | null; source_timestamp: string }[];
@@ -44,6 +45,18 @@ function velocity(
   return (latest.gravity - oldest.gravity) / days;
 }
 
+// ── Wine-type-aware temperature thresholds ────────────────────────────
+
+function tempHighThreshold(wineType: string): number {
+  if (wineType === "white" || wineType === "rosé") return 22;
+  return 30;
+}
+
+function tempLowThreshold(wineType: string): number {
+  if (wineType === "red" || wineType === "orange") return 10;
+  return 8;
+}
+
 // ── Evaluator ─────────────────────────────────────────────────────────
 
 export function evaluateAlerts(ctx: BatchAlertContext): AlertCandidate[] {
@@ -56,17 +69,25 @@ export function evaluateAlerts(ctx: BatchAlertContext): AlertCandidate[] {
 
   // ── Temperature alerts (need latest reading with a temperature) ────
   if (latest.temperature !== null) {
-    if (latest.temperature >= 30) {
+    const highThreshold = tempHighThreshold(ctx.wineType);
+    if (latest.temperature >= highThreshold) {
+      const reason = highThreshold < 30
+        ? `above optimal for ${ctx.wineType} wine (${highThreshold}°C) — risks losing aromatic quality`
+        : `above safe threshold (${highThreshold}°C)`;
       alerts.push({
         type: "temp_high",
-        message: `Temperature is ${latest.temperature}°C — above safe threshold (30°C)`,
+        message: `Temperature is ${latest.temperature}°C — ${reason}`,
         context: { temperature: latest.temperature },
       });
     }
-    if (latest.temperature <= 8) {
+    const lowThreshold = tempLowThreshold(ctx.wineType);
+    if (latest.temperature <= lowThreshold) {
+      const reason = lowThreshold > 8
+        ? `below safe threshold for ${ctx.wineType} wine (${lowThreshold}°C) — risks stuck fermentation`
+        : `below safe threshold (${lowThreshold}°C)`;
       alerts.push({
         type: "temp_low",
-        message: `Temperature is ${latest.temperature}°C — below safe threshold (8°C)`,
+        message: `Temperature is ${latest.temperature}°C — ${reason}`,
         context: { temperature: latest.temperature },
       });
     }
