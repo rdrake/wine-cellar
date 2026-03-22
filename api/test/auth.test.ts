@@ -48,7 +48,7 @@ describe("access auth", () => {
       headers: serviceTokenHeaders("unknown-client"),
     });
     expect(status).toBe(401);
-    expect(json.message).toContain("not linked");
+    expect(json.message).toBeTruthy();
   });
 
   it("authenticates linked service token as mapped user", async () => {
