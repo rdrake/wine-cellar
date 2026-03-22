@@ -3,7 +3,10 @@ import type { AppEnv } from "../app";
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
+import type { AuthenticatorTransportFuture } from "@simplewebauthn/types";
 import { storeChallenge, consumeChallenge } from "../lib/auth-challenge";
 import {
   createSession,
@@ -201,6 +204,96 @@ auth.post("/bootstrap", async (c) => {
   // Create session
   const secure = c.env.RP_ORIGIN.startsWith("https://");
   const { token } = await createSession(db, user.id);
+  setSessionCookie(c, token, secure);
+
+  return c.json({ status: "ok" });
+});
+
+// POST /login/options — generate authentication options for passkey login
+auth.post("/login/options", async (c) => {
+  const db = c.env.DB;
+
+  const options = await generateAuthenticationOptions({
+    rpID: c.env.RP_ID,
+    userVerification: "required",
+    allowCredentials: [],
+  });
+
+  const challengeId = await storeChallenge(db, options.challenge, "login");
+
+  return c.json({ challengeId, options });
+});
+
+// POST /login — verify authentication response and create session
+auth.post("/login", async (c) => {
+  const db = c.env.DB;
+  const body = await c.req.json<{ challengeId: string; credential: any }>();
+
+  // Consume challenge
+  const challengeData = await consumeChallenge(db, body.challengeId, "login");
+  if (!challengeData) {
+    return unauthorized("Invalid or expired challenge");
+  }
+
+  // Look up credential by ID
+  const storedCred = await db
+    .prepare(
+      "SELECT id, user_id, public_key, sign_count, transports FROM passkey_credentials WHERE id = ?",
+    )
+    .bind(body.credential.id)
+    .first<{
+      id: string;
+      user_id: string;
+      public_key: ArrayBuffer;
+      sign_count: number;
+      transports: string | null;
+    }>();
+
+  if (!storedCred) {
+    return unauthorized("Credential not found");
+  }
+
+  const pubKeyUint8 = new Uint8Array(storedCred.public_key as ArrayBuffer);
+  const transports: AuthenticatorTransportFuture[] = JSON.parse(
+    storedCred.transports || "[]",
+  );
+
+  // Verify authentication response
+  const verification = await verifyAuthenticationResponse({
+    response: body.credential,
+    expectedChallenge: challengeData.challenge,
+    expectedOrigin: c.env.RP_ORIGIN,
+    expectedRPID: c.env.RP_ID,
+    credential: {
+      id: storedCred.id,
+      publicKey: pubKeyUint8,
+      counter: storedCred.sign_count,
+      transports,
+    },
+  });
+
+  if (!verification.verified) {
+    return unauthorized("Verification failed");
+  }
+
+  // Update sign count with safety check (counter should not go backward)
+  const newCount = verification.authenticationInfo.newCounter;
+  const result = await db
+    .prepare(
+      `UPDATE passkey_credentials
+       SET sign_count = ?, last_used_at = datetime('now')
+       WHERE id = ? AND (sign_count = 0 OR sign_count < ?)`,
+    )
+    .bind(newCount, storedCred.id, newCount)
+    .run();
+
+  if ((result.meta?.changes ?? 0) === 0 && storedCred.sign_count > 0) {
+    return unauthorized("Credential counter went backward");
+  }
+
+  // Create session and set cookie
+  const secure = c.env.RP_ORIGIN.startsWith("https://");
+  const { token } = await createSession(db, storedCred.user_id);
   setSessionCookie(c, token, secure);
 
   return c.json({ status: "ok" });

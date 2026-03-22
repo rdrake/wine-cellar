@@ -124,6 +124,28 @@ describe("GET /api/v1/auth/status", () => {
   });
 });
 
+describe("POST /api/v1/auth/login/options", () => {
+  it("returns authentication options", async () => {
+    const { status, json } = await fetchJson("/api/v1/auth/login/options", {
+      method: "POST",
+    });
+    expect(status).toBe(200);
+    expect(json.challengeId).toBeDefined();
+    expect(json.options).toBeDefined();
+    expect(json.options.rpId).toBe("localhost");
+  });
+});
+
+describe("POST /api/v1/auth/login", () => {
+  it("returns 401 for invalid challenge", async () => {
+    const { status } = await fetchJson("/api/v1/auth/login", {
+      method: "POST",
+      body: { challengeId: "nonexistent", credential: {} },
+    });
+    expect(status).toBe(401);
+  });
+});
+
 describe("POST /api/v1/auth/bootstrap/options", () => {
   it("returns 403 with wrong setup token", async () => {
     const { status } = await fetchJson("/api/v1/auth/bootstrap/options", {
