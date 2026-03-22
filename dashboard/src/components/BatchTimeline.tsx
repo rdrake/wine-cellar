@@ -4,7 +4,8 @@ import { timeUntil } from "@/lib/dates";
 import type { Milestone, CurrentPhase } from "@/types";
 
 function formatDate(iso: string): string {
-  const normalized = iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z";
+  // estimated_date is YYYY-MM-DD — append T00:00:00Z for reliable cross-browser parsing
+  const normalized = iso.includes("T") ? iso : iso + "T00:00:00Z";
   return new Date(normalized).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 

@@ -6,7 +6,9 @@ import { formatDistanceToNow, parseISO } from "date-fns";
  */
 function parseUtc(dateStr: string): Date {
   if (dateStr.endsWith("Z") || dateStr.includes("+")) return parseISO(dateStr);
-  return parseISO(dateStr + "Z");
+  // Bare date "2026-03-28" needs full ISO suffix; datetime "2026-03-28 13:00:00" just needs Z
+  if (dateStr.includes("T") || dateStr.includes(" ")) return parseISO(dateStr + "Z");
+  return parseISO(dateStr + "T00:00:00Z");
 }
 
 /** "3 days ago", "about 2 months ago", etc. */
