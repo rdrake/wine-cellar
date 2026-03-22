@@ -4,6 +4,8 @@ import { api } from "@/api";
 import { useAuth } from "@/components/AuthGate";
 import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { GravitySparkline } from "@/components/Sparkline";
 import {
   Dialog,
@@ -14,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import type { Device, Batch, Reading } from "@/types";
+import type { Device, Batch, Reading, Passkey } from "@/types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -209,7 +211,7 @@ function ClaimSection({ onClaimed }: { onClaimed: () => void }) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">
         Enter a device ID to claim an unregistered RAPT Pill.
         The device must have sent at least one reading.
@@ -307,7 +309,7 @@ function NotificationsSection() {
   const supported = "serviceWorker" in navigator && "PushManager" in window;
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       {!supported ? (
         <p className="text-xs text-muted-foreground">
           Push notifications are not supported in this browser.
@@ -405,7 +407,7 @@ function ApiKeysSection() {
   if (loading) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm">API Keys</p>
@@ -464,7 +466,7 @@ function ApiKeysSection() {
           <DialogHeader>
             <DialogTitle>API Key Created</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <p className="text-sm text-muted-foreground">Copy this key now — you won't be able to see it again.</p>
             <div className="flex gap-2">
               <input
@@ -496,26 +498,151 @@ function ApiKeysSection() {
   );
 }
 
-// ── Account ──────────────────────────────────────────────────────────
+// ── Passkeys ─────────────────────────────────────────────────────────
 
-function AccountSection() {
-  const { user } = useAuth();
+function PasskeysSection() {
+  const [passkeys, setPasskeys] = useState<Passkey[]>([]);
+  const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [newPasskeyName, setNewPasskeyName] = useState("");
+  const [confirmRevoke, setConfirmRevoke] = useState<Passkey | null>(null);
 
-  async function handleRegisterPasskey() {
+  const fetchPasskeys = useCallback(async () => {
+    try {
+      const { items } = await api.auth.passkeys.list();
+      setPasskeys(items);
+    } catch {
+      toast.error("Couldn't load passkeys");
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchPasskeys();
+  }, [fetchPasskeys]);
+
+  async function handleRegister() {
+    const name = newPasskeyName.trim() || null;
+    setShowNamePrompt(false);
+    setNewPasskeyName("");
     setRegistering(true);
     try {
       const { challengeId, options } = await api.auth.registerOptions();
       const credential = await startRegistration({ optionsJSON: options });
-      await api.auth.register({ challengeId, credential });
+      await api.auth.register({ challengeId, credential, name: name ?? undefined });
       toast.success("Passkey registered");
+      fetchPasskeys();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Couldn't register passkey");
     } finally {
       setRegistering(false);
     }
   }
+
+  async function handleRevoke(passkey: Passkey) {
+    if (passkeys.length === 1) {
+      setConfirmRevoke(passkey);
+      return;
+    }
+    await doRevoke(passkey.id);
+  }
+
+  async function doRevoke(id: string) {
+    try {
+      await api.auth.passkeys.revoke(id);
+      toast.success("Passkey revoked");
+      setPasskeys((prev) => prev.filter((p) => p.id !== id));
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Couldn't revoke passkey");
+    }
+    setConfirmRevoke(null);
+  }
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading...</p>;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium">Passkeys</p>
+          <p className="text-xs text-muted-foreground">Sign in with biometrics or a security key.</p>
+        </div>
+        <Button size="sm" variant="outline" disabled={registering} onClick={() => setShowNamePrompt(true)}>
+          {registering ? "Registering..." : "Add"}
+        </Button>
+      </div>
+
+      {passkeys.length === 0 && (
+        <p className="text-xs text-muted-foreground">No passkeys registered.</p>
+      )}
+
+      {passkeys.map((pk) => (
+        <div key={pk.id} className="flex items-center justify-between py-1.5">
+          <div>
+            <p className="text-sm font-medium">{pk.name ?? "Unnamed passkey"}</p>
+            <p className="text-xs text-muted-foreground">
+              Created {relativeTime(pk.createdAt)}
+              {pk.lastUsedAt ? ` · used ${relativeTime(pk.lastUsedAt)}` : " · never used"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {pk.backedUp && (
+              <Badge variant="secondary">Synced</Badge>
+            )}
+            <Button size="sm" variant="ghost" className="text-destructive h-7 text-xs" onClick={() => handleRevoke(pk)}>
+              Revoke
+            </Button>
+          </div>
+        </div>
+      ))}
+
+      {/* Name prompt dialog */}
+      <Dialog open={showNamePrompt} onOpenChange={(open) => { if (!open) { setShowNamePrompt(false); setNewPasskeyName(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Name This Passkey</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Give it a name so you can identify it later, e.g. "MacBook" or "iPhone".</p>
+          <input
+            className="w-full px-3 py-2 text-sm border rounded bg-background"
+            placeholder="e.g. MacBook Pro"
+            value={newPasskeyName}
+            onChange={(e) => setNewPasskeyName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleRegister(); }}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowNamePrompt(false); setNewPasskeyName(""); }}>Cancel</Button>
+            <Button onClick={handleRegister}>Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Last passkey warning dialog */}
+      <Dialog open={!!confirmRevoke} onOpenChange={(open) => { if (!open) setConfirmRevoke(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke Last Passkey?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This is your only passkey. After revoking it, you'll need to use GitHub to sign in and register a new one.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmRevoke(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => confirmRevoke && doRevoke(confirmRevoke.id)}>Revoke</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── Account ──────────────────────────────────────────────────────────
+
+function AccountSection() {
+  const { user } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -529,7 +656,7 @@ function AccountSection() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
         {user.avatarUrl && (
           <img src={user.avatarUrl} alt="" className="h-10 w-10 rounded-full" />
@@ -540,16 +667,8 @@ function AccountSection() {
         </div>
       </div>
 
-      <div className="pt-3 border-t">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm">Passkeys</p>
-            <p className="text-xs text-muted-foreground">Add a passkey for another device.</p>
-          </div>
-          <Button size="sm" variant="outline" disabled={registering} onClick={handleRegisterPasskey}>
-            {registering ? "Registering..." : "Add Passkey"}
-          </Button>
-        </div>
+      <div className="pt-2 border-t">
+        <NotificationsSection />
       </div>
 
       <div className="pt-2 border-t">
@@ -589,60 +708,68 @@ export default function Settings() {
   }
 
   return (
-    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
-      {/* Sensors */}
-      <section>
-        <h2 className="text-sm font-semibold mb-2">
-          Sensors
-        </h2>
-        {loading && <p className="text-sm text-muted-foreground">Loading devices...</p>}
-        {error && (
-          <div className="text-sm text-destructive">
-            <p>Couldn't load devices. {error}</p>
-            <Button variant="link" size="sm" className="px-0" onClick={refetch}>Try again</Button>
+    <div className="p-4 max-w-lg lg:max-w-3xl mx-auto flex flex-col gap-4">
+      {/* Devices */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Devices</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3">
+            {loading && <p className="text-sm text-muted-foreground">Loading devices...</p>}
+            {error && (
+              <div className="text-sm text-destructive">
+                <p>Couldn't load devices. {error}</p>
+                <Button variant="link" size="sm" className="px-0" onClick={refetch}>Try again</Button>
+              </div>
+            )}
+            {devicesData && devicesData.items.length === 0 && (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No sensors registered. Devices appear automatically when your RAPT Pill sends its first reading.
+              </p>
+            )}
+            <div className="divide-y divide-border">
+              {devicesData?.items.map((device) => (
+                <DeviceCard
+                  key={device.id}
+                  device={device}
+                  batchName={device.batch_id ? batchNames.get(device.batch_id) ?? null : null}
+                  onAssign={setAssignDialog}
+                  onUnassign={handleUnassign}
+                />
+              ))}
+            </div>
+            <div className="pt-3 border-t">
+              <ClaimSection onClaimed={refetch} />
+            </div>
           </div>
-        )}
-        {devicesData && devicesData.items.length === 0 && (
-          <p className="text-sm text-muted-foreground py-4 text-center">
-            No sensors registered. Devices appear automatically when your RAPT Pill sends its first reading.
-          </p>
-        )}
-        <div className="divide-y divide-border">
-          {devicesData?.items.map((device) => (
-            <DeviceCard
-              key={device.id}
-              device={device}
-              batchName={device.batch_id ? batchNames.get(device.batch_id) ?? null : null}
-              onAssign={setAssignDialog}
-              onUnassign={handleUnassign}
-            />
-          ))}
-        </div>
-      </section>
+        </CardContent>
+      </Card>
 
-      {/* Claim Device */}
-      <section>
-        <h2 className="text-sm font-semibold mb-2">Claim Device</h2>
-        <ClaimSection onClaimed={refetch} />
-      </section>
-
-      {/* Notifications */}
-      <section>
-        <h2 className="text-sm font-semibold mb-2">Notifications</h2>
-        <NotificationsSection />
-      </section>
-
-      {/* API Keys */}
-      <section>
-        <h2 className="text-sm font-semibold mb-2">API Keys</h2>
-        <ApiKeysSection />
-      </section>
+      {/* Security */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Security</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4">
+            <PasskeysSection />
+            <div className="pt-1 border-t">
+              <ApiKeysSection />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Account */}
-      <section>
-        <h2 className="text-sm font-semibold mb-2">Account</h2>
-        <AccountSection />
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>Account</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AccountSection />
+        </CardContent>
+      </Card>
 
       {assignDialog && (
         <AssignDialog
