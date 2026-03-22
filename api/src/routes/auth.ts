@@ -7,6 +7,7 @@ import {
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
 import type { AuthenticatorTransportFuture } from "@simplewebauthn/server";
+import { GitHub } from "arctic";
 import { storeChallenge, consumeChallenge } from "../lib/auth-challenge";
 import {
   createSession,
@@ -16,198 +17,236 @@ import {
   setSessionCookie,
   clearSessionCookie,
 } from "../lib/auth-session";
-import { verifyAccessJwt, base64UrlEncode, base64UrlDecode } from "../lib/access-jwt";
-import { forbidden, unauthorized, notFound } from "../lib/errors";
-
-async function constantTimeEqual(a: string, b: string): Promise<boolean> {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    crypto.getRandomValues(new Uint8Array(32)),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const [sigA, sigB] = await Promise.all([
-    crypto.subtle.sign("HMAC", key, enc.encode(a)),
-    crypto.subtle.sign("HMAC", key, enc.encode(b)),
-  ]);
-  const a8 = new Uint8Array(sigA);
-  const b8 = new Uint8Array(sigB);
-  let diff = 0;
-  for (let i = 0; i < a8.length; i++) diff |= a8[i] ^ b8[i];
-  return diff === 0;
-}
+import { base64UrlEncode, base64UrlDecode } from "../lib/encoding";
+import { forbidden, unauthorized } from "../lib/errors";
 
 const auth = new Hono<AppEnv>();
 
-// GET /status — unauthenticated, checks auth state independently
+// GET /status — unauthenticated, checks auth state
 auth.get("/status", async (c) => {
-  const db = c.env.DB;
-  const credCount = await db
-    .prepare("SELECT COUNT(*) as count FROM passkey_credentials")
-    .first<{ count: number }>();
-  const registered = (credCount?.count ?? 0) > 0;
-
-  let authenticated = false;
-  const sessionToken = getSessionToken(c);
-  if (sessionToken) {
-    const userId = await validateSession(db, sessionToken);
-    authenticated = !!userId;
-  }
-  if (!authenticated) {
-    const jwt = c.req.header("Cf-Access-Jwt-Assertion");
-    if (jwt && c.env.CF_ACCESS_AUD) {
-      const result = await verifyAccessJwt(
-        jwt,
-        c.env.CF_ACCESS_AUD,
-        c.env.CF_ACCESS_TEAM,
-      );
-      authenticated = !!result;
+  const token = getSessionToken(c);
+  if (token) {
+    const userId = await validateSession(c.env.DB, token);
+    if (userId) {
+      const user = await c.env.DB
+        .prepare(
+          "SELECT id, email, name, avatar_url, onboarded FROM users WHERE id = ?",
+        )
+        .bind(userId)
+        .first<{
+          id: string;
+          email: string;
+          name: string | null;
+          avatar_url: string | null;
+          onboarded: number;
+        }>();
+      if (user) {
+        return c.json({
+          authenticated: true,
+          isNewUser: user.onboarded === 0,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            avatarUrl: user.avatar_url,
+          },
+        });
+      }
     }
   }
-  return c.json({ registered, authenticated });
+  return c.json({ authenticated: false });
 });
 
-// POST /bootstrap/options — generate registration options for first-time setup
-auth.post("/bootstrap/options", async (c) => {
-  const db = c.env.DB;
-  const body = await c.req.json<{ setupToken: string; email: string }>();
-
-  // Validate setup token
-  if (
-    !c.env.SETUP_TOKEN ||
-    !(await constantTimeEqual(body.setupToken, c.env.SETUP_TOKEN))
-  ) {
-    return forbidden("Invalid setup token");
-  }
-
-  // Check no credentials exist
-  const credCount = await db
-    .prepare("SELECT COUNT(*) as count FROM passkey_credentials")
-    .first<{ count: number }>();
-  if ((credCount?.count ?? 0) > 0) {
-    return forbidden("Credentials already registered");
-  }
-
-  // Look up user by email
-  const user = await db
-    .prepare("SELECT id, email FROM users WHERE email = ?")
-    .bind(body.email)
-    .first<{ id: string; email: string }>();
-  if (!user) {
-    return notFound("User");
-  }
-
-  // Generate webauthnUserId
-  const webauthnUserId = crypto.getRandomValues(new Uint8Array(64));
-
-  const options = await generateRegistrationOptions({
-    rpName: "Wine Cellar",
-    rpID: c.env.RP_ID,
-    userName: user.email,
-    userID: webauthnUserId,
-    attestationType: "none",
-    authenticatorSelection: {
-      residentKey: "required",
-      userVerification: "required",
-    },
-  });
-
-  // Store challenge
-  const challengeId = await storeChallenge(db, options.challenge, "bootstrap");
-
-  // Encode webauthnUserId to base64url
-  const encodedUserId = base64UrlEncode(webauthnUserId.buffer);
-
-  return c.json({ challengeId, options, webauthnUserId: encodedUserId });
+// GET /settings — public endpoint, returns registration settings
+auth.get("/settings", async (c) => {
+  const row = await c.env.DB
+    .prepare("SELECT value FROM settings WHERE key = 'registrations_open'")
+    .first<{ value: string }>();
+  return c.json({ registrationsOpen: row?.value === "true" });
 });
 
-// POST /bootstrap — verify registration and create first credential
-auth.post("/bootstrap", async (c) => {
-  const db = c.env.DB;
-  const body = await c.req.json<{
-    setupToken: string;
-    email: string;
-    challengeId: string;
-    credential: any;
-    webauthnUserId: string;
-  }>();
-
-  // Validate setup token
-  if (
-    !c.env.SETUP_TOKEN ||
-    !(await constantTimeEqual(body.setupToken, c.env.SETUP_TOKEN))
-  ) {
-    return forbidden("Invalid setup token");
-  }
-
-  // Check no credentials exist
-  const credCount = await db
-    .prepare("SELECT COUNT(*) as count FROM passkey_credentials")
-    .first<{ count: number }>();
-  if ((credCount?.count ?? 0) > 0) {
-    return forbidden("Credentials already registered");
-  }
-
-  // Look up user by email
-  const user = await db
-    .prepare("SELECT id, email FROM users WHERE email = ?")
-    .bind(body.email)
-    .first<{ id: string; email: string }>();
-  if (!user) {
-    return notFound("User");
-  }
-
-  // Consume challenge
-  const challengeData = await consumeChallenge(
-    db,
-    body.challengeId,
-    "bootstrap",
+// GET /github — OAuth initiation: redirects to GitHub
+auth.get("/github", async (c) => {
+  const github = new GitHub(
+    c.env.GITHUB_CLIENT_ID,
+    c.env.GITHUB_CLIENT_SECRET,
+    null,
   );
+  const state = crypto.randomUUID();
+  // Store the state as both the id and challenge so consumeChallenge(db, state, "oauth") works
+  await c.env.DB
+    .prepare(
+      "INSERT INTO auth_challenges (id, challenge, type, expires_at) VALUES (?, ?, 'oauth', datetime('now', '+10 minutes'))",
+    )
+    .bind(state, state)
+    .run();
+  const url = github.createAuthorizationURL(state, [
+    "read:user",
+    "user:email",
+  ]);
+  return c.redirect(url.toString());
+});
+
+// GET /github/callback — OAuth callback: exchange code, create/find user, create session
+auth.get("/github/callback", async (c) => {
+  const db = c.env.DB;
+  const stateParam = c.req.query("state");
+  const code = c.req.query("code");
+
+  // Validate state
+  if (!stateParam || !code) {
+    return c.redirect("/login?error=invalid_state");
+  }
+  const challengeData = await consumeChallenge(db, stateParam, "oauth");
   if (!challengeData) {
-    return unauthorized("Challenge expired or invalid");
+    return c.redirect("/login?error=invalid_state");
   }
 
-  // Verify registration response
-  const verification = await verifyRegistrationResponse({
-    response: body.credential,
-    expectedChallenge: challengeData.challenge,
-    expectedOrigin: c.env.RP_ORIGIN,
-    expectedRPID: c.env.RP_ID,
-  });
-
-  if (!verification.verified || !verification.registrationInfo) {
-    return unauthorized("Registration verification failed");
+  // Exchange code for token
+  const github = new GitHub(
+    c.env.GITHUB_CLIENT_ID,
+    c.env.GITHUB_CLIENT_SECRET,
+    null,
+  );
+  let tokens;
+  try {
+    tokens = await github.validateAuthorizationCode(code);
+  } catch {
+    return c.redirect("/login?error=github_error");
   }
 
-  const { credential, credentialDeviceType, credentialBackedUp } =
-    verification.registrationInfo;
+  // Fetch GitHub user profile
+  let ghUser: {
+    id: number;
+    login: string;
+    name: string | null;
+    email: string | null;
+    avatar_url: string | null;
+  };
+  try {
+    const userRes = await fetch("https://api.github.com/user", {
+      headers: {
+        Authorization: `Bearer ${tokens.accessToken()}`,
+        Accept: "application/json",
+        "User-Agent": "wine-cellar",
+      },
+    });
+    if (!userRes.ok) {
+      return c.redirect("/login?error=github_error");
+    }
+    ghUser = (await userRes.json()) as typeof ghUser;
+  } catch {
+    return c.redirect("/login?error=github_error");
+  }
 
-  // Store credential
+  // If email is null, fetch from /user/emails
+  let email = ghUser.email;
+  if (!email) {
+    try {
+      const emailsRes = await fetch("https://api.github.com/user/emails", {
+        headers: {
+          Authorization: `Bearer ${tokens.accessToken()}`,
+          Accept: "application/json",
+          "User-Agent": "wine-cellar",
+        },
+      });
+      if (emailsRes.ok) {
+        const emails = (await emailsRes.json()) as Array<{
+          email: string;
+          primary: boolean;
+          verified: boolean;
+        }>;
+        const primary = emails.find((e) => e.primary && e.verified);
+        email = primary?.email ?? null;
+      }
+    } catch {
+      // Fall through — email stays null
+    }
+  }
+
+  if (!email) {
+    return c.redirect("/login?error=email_required");
+  }
+
+  const githubId = String(ghUser.id);
+  const displayName = ghUser.name ?? ghUser.login;
+  const avatarUrl = ghUser.avatar_url ?? null;
+  const secure = c.env.RP_ORIGIN.startsWith("https://");
+
+  // Look up oauth_accounts by (provider='github', provider_user_id=githubId)
+  const oauthAccount = await db
+    .prepare(
+      "SELECT user_id FROM oauth_accounts WHERE provider = 'github' AND provider_user_id = ?",
+    )
+    .bind(githubId)
+    .first<{ user_id: string }>();
+
+  if (oauthAccount) {
+    // Existing OAuth link — update profile info and create session
+    await db
+      .prepare(
+        "UPDATE oauth_accounts SET email = ?, name = ?, avatar_url = ? WHERE provider = 'github' AND provider_user_id = ?",
+      )
+      .bind(email, displayName, avatarUrl, githubId)
+      .run();
+    await db
+      .prepare("UPDATE users SET name = ?, avatar_url = ? WHERE id = ?")
+      .bind(displayName, avatarUrl, oauthAccount.user_id)
+      .run();
+
+    const { token } = await createSession(db, oauthAccount.user_id);
+    setSessionCookie(c, token, secure);
+    return c.redirect("/");
+  }
+
+  // No OAuth link — check if user exists by email
+  const existingUser = await db
+    .prepare("SELECT id FROM users WHERE email = ?")
+    .bind(email)
+    .first<{ id: string }>();
+
+  if (existingUser) {
+    // Link OAuth account to existing user
+    await db
+      .prepare(
+        "INSERT INTO oauth_accounts (provider, provider_user_id, user_id, email, name, avatar_url) VALUES ('github', ?, ?, ?, ?, ?)",
+      )
+      .bind(githubId, existingUser.id, email, displayName, avatarUrl)
+      .run();
+
+    const { token } = await createSession(db, existingUser.id);
+    setSessionCookie(c, token, secure);
+    return c.redirect("/");
+  }
+
+  // No user — check if registrations are open
+  const regSetting = await db
+    .prepare("SELECT value FROM settings WHERE key = 'registrations_open'")
+    .first<{ value: string }>();
+  if (regSetting?.value !== "true") {
+    return c.redirect("/login?error=registrations_closed");
+  }
+
+  // Create new user (onboarded=0)
+  const newUserId = crypto.randomUUID();
   await db
     .prepare(
-      `INSERT INTO passkey_credentials (id, user_id, public_key, webauthn_user_id, sign_count, transports, device_type, backed_up)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      "INSERT INTO users (id, email, name, avatar_url, onboarded) VALUES (?, ?, ?, ?, 0)",
     )
-    .bind(
-      credential.id,
-      user.id,
-      credential.publicKey as unknown as ArrayBuffer,
-      body.webauthnUserId,
-      credential.counter,
-      JSON.stringify(credential.transports ?? []),
-      credentialDeviceType,
-      credentialBackedUp ? 1 : 0,
-    )
+    .bind(newUserId, email, displayName, avatarUrl)
     .run();
 
-  // Create session
-  const secure = c.env.RP_ORIGIN.startsWith("https://");
-  const { token } = await createSession(db, user.id);
-  setSessionCookie(c, token, secure);
+  // Create OAuth account link
+  await db
+    .prepare(
+      "INSERT INTO oauth_accounts (provider, provider_user_id, user_id, email, name, avatar_url) VALUES ('github', ?, ?, ?, ?, ?)",
+    )
+    .bind(githubId, newUserId, email, displayName, avatarUrl)
+    .run();
 
-  return c.json({ status: "ok" });
+  const { token } = await createSession(db, newUserId);
+  setSessionCookie(c, token, secure);
+  return c.redirect("/welcome");
 });
 
 // POST /login/options — generate authentication options for passkey login
@@ -311,7 +350,11 @@ auth.post("/register/options", async (c) => {
       "SELECT id, webauthn_user_id, transports FROM passkey_credentials WHERE user_id = ?",
     )
     .bind(user.id)
-    .all<{ id: string; webauthn_user_id: string; transports: string | null }>();
+    .all<{
+      id: string;
+      webauthn_user_id: string;
+      transports: string | null;
+    }>();
 
   // Determine webauthn_user_id — reuse existing or generate new
   let webauthnUserId: Uint8Array;
@@ -319,7 +362,6 @@ auth.post("/register/options", async (c) => {
     const encodedUserId = existingCreds.results[0].webauthn_user_id;
     webauthnUserId = base64UrlDecode(encodedUserId);
   } else {
-    // Defensive: shouldn't happen since auth requires a credential, but handle gracefully
     webauthnUserId = crypto.getRandomValues(new Uint8Array(64));
   }
 
@@ -432,6 +474,81 @@ auth.post("/logout", async (c) => {
   const secure = c.env.RP_ORIGIN.startsWith("https://");
   clearSessionCookie(c, secure);
   return c.json({ status: "ok" });
+});
+
+// Users router — mounted at /api/v1/users in app.ts
+export const usersRouter = new Hono<AppEnv>();
+
+usersRouter.get("/me", async (c) => {
+  const user = c.get("user");
+  const full = await c.env.DB
+    .prepare(
+      "SELECT id, email, name, avatar_url, onboarded FROM users WHERE id = ?",
+    )
+    .bind(user.id)
+    .first<{
+      id: string;
+      email: string;
+      name: string | null;
+      avatar_url: string | null;
+      onboarded: number;
+    }>();
+  if (!full) {
+    return c.json({ error: "User not found" }, 404);
+  }
+  return c.json({
+    id: full.id,
+    email: full.email,
+    name: full.name,
+    avatarUrl: full.avatar_url,
+    onboarded: full.onboarded === 1,
+  });
+});
+
+usersRouter.patch("/me", async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json();
+
+  if (body.name !== undefined) {
+    if (
+      typeof body.name !== "string" ||
+      body.name.length < 1 ||
+      body.name.length > 100
+    ) {
+      return c.json({ error: "Name must be 1-100 characters" }, 400);
+    }
+    await c.env.DB
+      .prepare("UPDATE users SET name = ? WHERE id = ?")
+      .bind(body.name, user.id)
+      .run();
+  }
+
+  if (body.onboarded === true) {
+    await c.env.DB
+      .prepare("UPDATE users SET onboarded = 1 WHERE id = ?")
+      .bind(user.id)
+      .run();
+  }
+
+  const updated = await c.env.DB
+    .prepare(
+      "SELECT id, email, name, avatar_url, onboarded FROM users WHERE id = ?",
+    )
+    .bind(user.id)
+    .first<{
+      id: string;
+      email: string;
+      name: string | null;
+      avatar_url: string | null;
+      onboarded: number;
+    }>();
+  return c.json({
+    id: updated!.id,
+    email: updated!.email,
+    name: updated!.name,
+    avatarUrl: updated!.avatar_url,
+    onboarded: updated!.onboarded === 1,
+  });
 });
 
 export default auth;

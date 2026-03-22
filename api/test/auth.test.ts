@@ -56,29 +56,97 @@ describe("session auth", () => {
 });
 
 describe("GET /api/v1/auth/status", () => {
-  it("returns registered=false when no credentials exist", async () => {
+  it("returns authenticated=false when no session", async () => {
     const { status, json } = await fetchJson("/api/v1/auth/status");
     expect(status).toBe(200);
-    expect(json.registered).toBe(false);
     expect(json.authenticated).toBe(false);
   });
 
-  it("returns registered=true when credentials exist", async () => {
+  it("returns authenticated=true with user info when session valid", async () => {
     const { token, userId } = await seedSession();
-    await seedCredential(userId);
-    const { json } = await fetchJson("/api/v1/auth/status");
-    expect(json.registered).toBe(true);
-    expect(json.authenticated).toBe(false);
+    const { status, json } = await fetchJson("/api/v1/auth/status", {
+      headers: sessionHeaders(token),
+    });
+    expect(status).toBe(200);
+    expect(json.authenticated).toBe(true);
+    expect(json.isNewUser).toBe(false);
+    expect(json.user).toBeDefined();
+    expect(json.user.id).toBe(userId);
+    expect(json.user.email).toBe(TEST_USER_EMAIL);
   });
 
-  it("returns authenticated=true with valid session cookie", async () => {
-    const { token, userId } = await seedSession();
-    await seedCredential(userId);
+  it("returns isNewUser=true for un-onboarded user", async () => {
+    // Create un-onboarded user
+    const userId = crypto.randomUUID();
+    await env.DB.prepare(
+      "INSERT INTO users (id, email, name, onboarded) VALUES (?, ?, ?, 0)",
+    )
+      .bind(userId, "new@example.com", "new")
+      .run();
+    const { createSession } = await import("../src/lib/auth-session");
+    const { token } = await createSession(env.DB, userId);
     const { json } = await fetchJson("/api/v1/auth/status", {
       headers: sessionHeaders(token),
     });
-    expect(json.registered).toBe(true);
     expect(json.authenticated).toBe(true);
+    expect(json.isNewUser).toBe(true);
+  });
+});
+
+describe("GET /api/v1/auth/settings", () => {
+  it("returns registrationsOpen from settings table", async () => {
+    const { status, json } = await fetchJson("/api/v1/auth/settings");
+    expect(status).toBe(200);
+    expect(json.registrationsOpen).toBe(true);
+  });
+
+  it("reflects updates to registrations_open setting", async () => {
+    await env.DB.prepare(
+      "UPDATE settings SET value = 'false' WHERE key = 'registrations_open'",
+    ).run();
+    const { json } = await fetchJson("/api/v1/auth/settings");
+    expect(json.registrationsOpen).toBe(false);
+  });
+});
+
+describe("GET /api/v1/auth/github", () => {
+  it("redirects to GitHub with correct client_id and stores oauth challenge", async () => {
+    const res = await SELF.fetch("http://localhost/api/v1/auth/github", {
+      redirect: "manual",
+    });
+    expect(res.status).toBe(302);
+    const location = res.headers.get("Location")!;
+    expect(location).toContain("github.com");
+    expect(location).toContain("client_id=test-github-client-id");
+    expect(location).toContain("scope=read%3Auser+user%3Aemail");
+
+    // Should have stored an oauth challenge
+    const challenge = await env.DB.prepare(
+      "SELECT * FROM auth_challenges WHERE type = 'oauth'",
+    ).first();
+    expect(challenge).toBeTruthy();
+  });
+});
+
+// We can't easily test the full GitHub callback flow since it requires
+// mocking external GitHub API calls, but we can test error cases
+describe("GET /api/v1/auth/github/callback", () => {
+  it("redirects to /login?error=invalid_state for missing state", async () => {
+    const res = await SELF.fetch(
+      "http://localhost/api/v1/auth/github/callback?code=abc",
+      { redirect: "manual" },
+    );
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/login?error=invalid_state");
+  });
+
+  it("redirects to /login?error=invalid_state for bad state", async () => {
+    const res = await SELF.fetch(
+      "http://localhost/api/v1/auth/github/callback?code=abc&state=bad-state",
+      { redirect: "manual" },
+    );
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/login?error=invalid_state");
   });
 });
 
@@ -101,56 +169,6 @@ describe("POST /api/v1/auth/login", () => {
       body: { challengeId: "nonexistent", credential: {} },
     });
     expect(status).toBe(401);
-  });
-});
-
-describe("POST /api/v1/auth/bootstrap/options", () => {
-  it("returns 403 with wrong setup token", async () => {
-    const { token } = await seedSession();
-    const { status } = await fetchJson("/api/v1/auth/bootstrap/options", {
-      method: "POST",
-      headers: sessionHeaders(token),
-      body: { setupToken: "wrong-token", email: TEST_USER_EMAIL },
-    });
-    expect(status).toBe(403);
-  });
-
-  it("returns 404 when email not found", async () => {
-    const { token } = await seedSession();
-    const { status } = await fetchJson("/api/v1/auth/bootstrap/options", {
-      method: "POST",
-      headers: sessionHeaders(token),
-      body: { setupToken: "test-setup-token", email: "nobody@example.com" },
-    });
-    expect(status).toBe(404);
-  });
-
-  it("returns 403 when credentials already exist", async () => {
-    const { token, userId } = await seedSession();
-    await seedCredential(userId);
-    const { status } = await fetchJson("/api/v1/auth/bootstrap/options", {
-      method: "POST",
-      headers: sessionHeaders(token),
-      body: { setupToken: "test-setup-token", email: TEST_USER_EMAIL },
-    });
-    expect(status).toBe(403);
-  });
-
-  it("returns registration options for valid request", async () => {
-    const { token } = await seedSession();
-    const { status, json } = await fetchJson(
-      "/api/v1/auth/bootstrap/options",
-      {
-        method: "POST",
-        headers: sessionHeaders(token),
-        body: { setupToken: "test-setup-token", email: TEST_USER_EMAIL },
-      },
-    );
-    expect(status).toBe(200);
-    expect(json.challengeId).toBeDefined();
-    expect(json.options).toBeDefined();
-    expect(json.options.rp.id).toBe("localhost");
-    expect(json.options.user.name).toBe(TEST_USER_EMAIL);
   });
 });
 
@@ -199,6 +217,86 @@ describe("POST /api/v1/auth/logout", () => {
   });
 });
 
+describe("GET /api/v1/users/me", () => {
+  it("returns 401 without auth", async () => {
+    const { status } = await fetchJson("/api/v1/users/me");
+    expect(status).toBe(401);
+  });
+
+  it("returns user profile", async () => {
+    const { token, userId } = await seedSession();
+    const { status, json } = await fetchJson("/api/v1/users/me", {
+      headers: sessionHeaders(token),
+    });
+    expect(status).toBe(200);
+    expect(json.id).toBe(userId);
+    expect(json.email).toBe(TEST_USER_EMAIL);
+    expect(json.onboarded).toBe(true);
+  });
+});
+
+describe("PATCH /api/v1/users/me", () => {
+  it("returns 401 without auth", async () => {
+    const { status } = await fetchJson("/api/v1/users/me", {
+      method: "PATCH",
+      body: { name: "New Name" },
+    });
+    expect(status).toBe(401);
+  });
+
+  it("updates name", async () => {
+    const { token } = await seedSession();
+    const { status, json } = await fetchJson("/api/v1/users/me", {
+      method: "PATCH",
+      headers: sessionHeaders(token),
+      body: { name: "Updated Name" },
+    });
+    expect(status).toBe(200);
+    expect(json.name).toBe("Updated Name");
+  });
+
+  it("marks user as onboarded", async () => {
+    // Create un-onboarded user
+    const userId = crypto.randomUUID();
+    await env.DB.prepare(
+      "INSERT INTO users (id, email, name, onboarded) VALUES (?, ?, ?, 0)",
+    )
+      .bind(userId, "onboard@example.com", "onboard")
+      .run();
+    const { createSession } = await import("../src/lib/auth-session");
+    const { token } = await createSession(env.DB, userId);
+
+    const { status, json } = await fetchJson("/api/v1/users/me", {
+      method: "PATCH",
+      headers: sessionHeaders(token),
+      body: { onboarded: true },
+    });
+    expect(status).toBe(200);
+    expect(json.onboarded).toBe(true);
+  });
+
+  it("rejects name over 100 chars", async () => {
+    const { token } = await seedSession();
+    const { status, json } = await fetchJson("/api/v1/users/me", {
+      method: "PATCH",
+      headers: sessionHeaders(token),
+      body: { name: "x".repeat(101) },
+    });
+    expect(status).toBe(400);
+    expect(json.error).toBeDefined();
+  });
+
+  it("rejects empty name", async () => {
+    const { token } = await seedSession();
+    const { status } = await fetchJson("/api/v1/users/me", {
+      method: "PATCH",
+      headers: sessionHeaders(token),
+      body: { name: "" },
+    });
+    expect(status).toBe(400);
+  });
+});
+
 describe("auth cron cleanup", () => {
   it("removes expired sessions and challenges", async () => {
     const { token } = await seedSession();
@@ -226,3 +324,6 @@ describe("auth cron cleanup", () => {
     expect(challenges!.count).toBe(0);
   });
 });
+
+// Import SELF for redirect tests
+import { SELF } from "cloudflare:test";
