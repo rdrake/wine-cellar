@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   projectTimeline,
+  computeCurrentPhase,
   addDays,
   isPastStage,
   type TimelineContext,
+  type CurrentPhaseContext,
 } from "../src/lib/winemaking/timeline";
 
 function baseContext(overrides: Partial<TimelineContext> = {}): TimelineContext {
@@ -234,5 +236,82 @@ describe("projectTimeline", () => {
     // Third: +90 → Jul 13
     // Bottling: +90 → Oct 11
     expect(bottling!.estimated_date).toBe("2026-10-11");
+  });
+});
+
+describe("computeCurrentPhase", () => {
+  it("returns primary fermentation with estimated total days for red", () => {
+    const result = computeCurrentPhase({
+      stage: "primary_fermentation",
+      wineType: "red",
+      sourceMaterial: "fresh_grapes",
+      stageEnteredAt: "2026-03-17",
+      now: "2026-03-22",
+    });
+    expect(result.label).toBe("Primary Fermentation");
+    expect(result.stage).toBe("primary_fermentation");
+    expect(result.daysElapsed).toBe(5);
+    expect(result.estimatedTotalDays).toBe(7);
+  });
+
+  it("returns 14-day estimate for white primary", () => {
+    const result = computeCurrentPhase({
+      stage: "primary_fermentation",
+      wineType: "white",
+      sourceMaterial: "fresh_grapes",
+      stageEnteredAt: "2026-03-10",
+      now: "2026-03-22",
+    });
+    expect(result.daysElapsed).toBe(12);
+    expect(result.estimatedTotalDays).toBe(14);
+  });
+
+  it("returns 7-day estimate for kit primary", () => {
+    const result = computeCurrentPhase({
+      stage: "primary_fermentation",
+      wineType: "white",
+      sourceMaterial: "kit",
+      stageEnteredAt: "2026-03-20",
+      now: "2026-03-22",
+    });
+    expect(result.estimatedTotalDays).toBe(7);
+  });
+
+  it("returns null estimatedTotalDays for stabilization (open-ended)", () => {
+    const result = computeCurrentPhase({
+      stage: "stabilization",
+      wineType: "red",
+      sourceMaterial: "fresh_grapes",
+      stageEnteredAt: "2026-01-01",
+      now: "2026-03-22",
+    });
+    expect(result.label).toBe("Stabilization & Aging");
+    expect(result.daysElapsed).toBe(80);
+    expect(result.estimatedTotalDays).toBeNull();
+  });
+
+  it("returns secondary fermentation with null estimate", () => {
+    const result = computeCurrentPhase({
+      stage: "secondary_fermentation",
+      wineType: "red",
+      sourceMaterial: "fresh_grapes",
+      stageEnteredAt: "2026-03-10",
+      now: "2026-03-22",
+    });
+    expect(result.label).toBe("Secondary Fermentation");
+    expect(result.daysElapsed).toBe(12);
+    expect(result.estimatedTotalDays).toBeNull();
+  });
+
+  it("falls back to batchStartedAt when stageEnteredAt is null", () => {
+    const result = computeCurrentPhase({
+      stage: "must_prep",
+      wineType: "red",
+      sourceMaterial: "fresh_grapes",
+      stageEnteredAt: null,
+      now: "2026-03-22",
+      batchStartedAt: "2026-03-20",
+    });
+    expect(result.daysElapsed).toBe(2);
   });
 });

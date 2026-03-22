@@ -37,6 +37,51 @@ export function isPastStage(current: string, target: string): boolean {
   return currentIdx > targetIdx;
 }
 
+export interface CurrentPhaseContext {
+  stage: string;
+  wineType: string;
+  sourceMaterial: string;
+  stageEnteredAt: string | null; // ISO date (YYYY-MM-DD)
+  now?: string; // ISO date for testing, defaults to today
+  batchStartedAt?: string; // fallback if stageEnteredAt is null
+}
+
+export interface CurrentPhase {
+  label: string;
+  stage: string;
+  daysElapsed: number;
+  estimatedTotalDays: number | null;
+}
+
+const PHASE_LABELS: Record<string, string> = {
+  must_prep: "Must Preparation",
+  primary_fermentation: "Primary Fermentation",
+  secondary_fermentation: "Secondary Fermentation",
+  stabilization: "Stabilization & Aging",
+  bottling: "Bottling",
+};
+
+export function computeCurrentPhase(ctx: CurrentPhaseContext): CurrentPhase {
+  const now = ctx.now ?? new Date().toISOString().slice(0, 10);
+  const enteredAt = ctx.stageEnteredAt ?? ctx.batchStartedAt ?? now;
+
+  const nowMs = new Date(now + "T00:00:00Z").getTime();
+  const enteredMs = new Date(enteredAt + "T00:00:00Z").getTime();
+  const daysElapsed = Math.floor((nowMs - enteredMs) / 86_400_000);
+
+  let estimatedTotalDays: number | null = null;
+  if (ctx.stage === "primary_fermentation") {
+    estimatedTotalDays = typicalPrimaryDays(ctx.wineType, ctx.sourceMaterial);
+  }
+
+  return {
+    label: PHASE_LABELS[ctx.stage] ?? ctx.stage,
+    stage: ctx.stage,
+    daysElapsed,
+    estimatedTotalDays,
+  };
+}
+
 /**
  * Typical primary fermentation duration in days, by wine type / source.
  * Kits and reds: ~7 days. Whites and everything else: ~14 days.

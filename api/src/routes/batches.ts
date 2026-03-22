@@ -4,7 +4,7 @@ import { BatchCreateSchema, BatchUpdateSchema, StageSetSchema } from "../models"
 import { notFound, conflict, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
 import { WAYPOINT_ORDER } from "../schema";
-import { generateNudges, projectTimeline, calculateDrinkWindow, fetchWinemakingActivityContext, computeVelocityPerDay } from "../lib/winemaking";
+import { generateNudges, projectTimeline, computeCurrentPhase, calculateDrinkWindow, fetchWinemakingActivityContext, fetchStageEnteredAt, computeVelocityPerDay } from "../lib/winemaking";
 
 const batches = new Hono<AppEnv>();
 
@@ -104,7 +104,7 @@ batches.get("/:batchId", async (c) => {
         finalGravity: gravityRow?.gravity ?? null,
       });
     }
-    return c.json({ ...row, nudges: [], timeline: [], cellaring });
+    return c.json({ ...row, nudges: [], timeline: [], currentPhase: null, cellaring });
   }
 
   // Gather context data for nudges and timeline
@@ -146,7 +146,17 @@ batches.get("/:batchId", async (c) => {
     mlfInoculatedAt: activityCtx.mlfInoculatedAt,
   });
 
-  return c.json({ ...row, nudges, timeline });
+  const stageEnteredAt = await fetchStageEnteredAt(db, batchId, userId, row.stage);
+
+  const currentPhase = computeCurrentPhase({
+    stage: row.stage,
+    wineType: row.wine_type,
+    sourceMaterial: row.source_material,
+    stageEnteredAt,
+    batchStartedAt: startedDate,
+  });
+
+  return c.json({ ...row, nudges, timeline, currentPhase });
 });
 
 batches.patch("/:batchId", async (c) => {

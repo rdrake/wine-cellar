@@ -45,6 +45,21 @@ export async function fetchWinemakingActivityContext(
   };
 }
 
+export async function fetchStageEnteredAt(
+  db: D1Database,
+  batchId: string,
+  userId: string,
+  currentStage: string,
+): Promise<string | null> {
+  const row = await db.prepare(
+    `SELECT recorded_at FROM activities
+     WHERE batch_id = ? AND user_id = ? AND type = 'note'
+     AND title LIKE '%to ' || ?
+     ORDER BY recorded_at DESC LIMIT 1`
+  ).bind(batchId, userId, currentStage).first<{ recorded_at: string }>();
+  return row ? row.recorded_at.slice(0, 10) : null;
+}
+
 /** Compute gravity velocity (SG change per day) from readings sorted by source_timestamp. */
 export function computeVelocityPerDay(
   readings: { gravity: number; source_timestamp: string }[],
