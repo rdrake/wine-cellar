@@ -18,7 +18,8 @@ import {
   clearSessionCookie,
 } from "../lib/auth-session";
 import { base64UrlEncode, base64UrlDecode } from "../lib/encoding";
-import { forbidden, unauthorized } from "../lib/errors";
+import { forbidden, unauthorized, notFound } from "../lib/errors";
+import { createApiKey, listApiKeys, deleteApiKey } from "../lib/api-keys";
 
 const auth = new Hono<AppEnv>();
 
@@ -463,6 +464,40 @@ auth.post("/register", async (c) => {
     .run();
 
   return c.json({ status: "ok" });
+});
+
+// POST /api-keys — create a new API key (requires session)
+auth.post("/api-keys", async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json<{ name?: string }>();
+
+  if (!body.name || typeof body.name !== "string" || body.name.trim().length === 0) {
+    return c.json({ error: "Name is required" }, 400);
+  }
+  if (body.name.length > 100) {
+    return c.json({ error: "Name must be 100 characters or fewer" }, 400);
+  }
+
+  const result = await createApiKey(c.env.DB, user.id, body.name.trim());
+  return c.json(result, 201);
+});
+
+// GET /api-keys — list API keys for the authenticated user (requires session)
+auth.get("/api-keys", async (c) => {
+  const user = c.get("user");
+  const items = await listApiKeys(c.env.DB, user.id);
+  return c.json({ items });
+});
+
+// DELETE /api-keys/:id — revoke an API key (requires session)
+auth.delete("/api-keys/:id", async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+  const deleted = await deleteApiKey(c.env.DB, id, user.id);
+  if (!deleted) {
+    return notFound("API key");
+  }
+  return c.body(null, 204);
 });
 
 // POST /logout — destroy session and clear cookie (requires session)

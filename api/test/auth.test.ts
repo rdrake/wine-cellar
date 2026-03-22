@@ -343,6 +343,159 @@ describe("PATCH /api/v1/users/me", () => {
   });
 });
 
+describe("POST /api/v1/auth/api-keys", () => {
+  it("returns 401 without auth", async () => {
+    const { status } = await fetchJson("/api/v1/auth/api-keys", {
+      method: "POST",
+      body: { name: "Test" },
+    });
+    expect(status).toBe(401);
+  });
+
+  it("creates an API key and returns it with full key", async () => {
+    const { status, json } = await fetchJson("/api/v1/auth/api-keys", {
+      method: "POST",
+      headers: await authHeaders(),
+      body: { name: "MCP Server" },
+    });
+    expect(status).toBe(201);
+    expect(json.name).toBe("MCP Server");
+    expect(json.key).toMatch(/^wc-[0-9a-f]{64}$/);
+    expect(json.prefix).toBe(json.key.slice(0, 8));
+    expect(json.id).toBeDefined();
+    expect(json.createdAt).toBeDefined();
+  });
+
+  it("rejects empty name", async () => {
+    const { status } = await fetchJson("/api/v1/auth/api-keys", {
+      method: "POST",
+      headers: await authHeaders(),
+      body: { name: "" },
+    });
+    expect(status).toBe(400);
+  });
+
+  it("rejects missing name", async () => {
+    const { status } = await fetchJson("/api/v1/auth/api-keys", {
+      method: "POST",
+      headers: await authHeaders(),
+      body: {},
+    });
+    expect(status).toBe(400);
+  });
+
+  it("rejects name over 100 characters", async () => {
+    const { status } = await fetchJson("/api/v1/auth/api-keys", {
+      method: "POST",
+      headers: await authHeaders(),
+      body: { name: "x".repeat(101) },
+    });
+    expect(status).toBe(400);
+  });
+});
+
+describe("GET /api/v1/auth/api-keys", () => {
+  it("returns 401 without auth", async () => {
+    const { status } = await fetchJson("/api/v1/auth/api-keys");
+    expect(status).toBe(401);
+  });
+
+  it("returns empty list when no keys exist", async () => {
+    const { status, json } = await fetchJson("/api/v1/auth/api-keys", {
+      headers: await authHeaders(),
+    });
+    expect(status).toBe(200);
+    expect(json.items).toEqual([]);
+  });
+
+  it("lists created keys without full key", async () => {
+    const headers = await authHeaders();
+    await fetchJson("/api/v1/auth/api-keys", {
+      method: "POST",
+      headers,
+      body: { name: "Key 1" },
+    });
+    const { json } = await fetchJson("/api/v1/auth/api-keys", { headers });
+    expect(json.items).toHaveLength(1);
+    expect(json.items[0].name).toBe("Key 1");
+    expect(json.items[0].key).toBeUndefined();
+    expect(json.items[0].prefix).toBeDefined();
+  });
+});
+
+describe("DELETE /api/v1/auth/api-keys/:id", () => {
+  it("returns 401 without auth", async () => {
+    const { status } = await fetchJson("/api/v1/auth/api-keys/some-id", {
+      method: "DELETE",
+    });
+    expect(status).toBe(401);
+  });
+
+  it("revokes an existing key", async () => {
+    const headers = await authHeaders();
+    const { json: created } = await fetchJson("/api/v1/auth/api-keys", {
+      method: "POST",
+      headers,
+      body: { name: "To Revoke" },
+    });
+    const { status } = await fetchJson(`/api/v1/auth/api-keys/${created.id}`, {
+      method: "DELETE",
+      headers,
+    });
+    expect(status).toBe(204);
+    // Verify it's gone
+    const { json: list } = await fetchJson("/api/v1/auth/api-keys", { headers });
+    expect(list.items).toHaveLength(0);
+  });
+
+  it("returns 404 for nonexistent key", async () => {
+    const { status } = await fetchJson("/api/v1/auth/api-keys/nonexistent", {
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
+    expect(status).toBe(404);
+  });
+
+  it("returns 404 when trying to delete another user's key", async () => {
+    const ownerHeaders = await authHeaders("owner@example.com");
+    const { json: created } = await fetchJson("/api/v1/auth/api-keys", {
+      method: "POST",
+      headers: ownerHeaders,
+      body: { name: "Owner's Key" },
+    });
+    const attackerHeaders = await authHeaders("attacker@example.com");
+    const { status } = await fetchJson(`/api/v1/auth/api-keys/${created.id}`, {
+      method: "DELETE",
+      headers: attackerHeaders,
+    });
+    expect(status).toBe(404);
+  });
+
+  it("revoked key can no longer authenticate", async () => {
+    const headers = await authHeaders();
+    const { json: created } = await fetchJson("/api/v1/auth/api-keys", {
+      method: "POST",
+      headers,
+      body: { name: "Ephemeral" },
+    });
+    // Use the key
+    const { status: before } = await fetchJson("/api/v1/batches", {
+      headers: { Authorization: `Bearer ${created.key}` },
+    });
+    expect(before).toBe(200);
+    // Revoke it
+    await fetchJson(`/api/v1/auth/api-keys/${created.id}`, {
+      method: "DELETE",
+      headers,
+    });
+    // Try to use it again
+    const { status: after } = await fetchJson("/api/v1/batches", {
+      headers: { Authorization: `Bearer ${created.key}` },
+    });
+    expect(after).toBe(401);
+  });
+});
+
 describe("auth cron cleanup", () => {
   it("removes expired sessions and challenges", async () => {
     const { token } = await seedSession();
