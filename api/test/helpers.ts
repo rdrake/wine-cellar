@@ -1,4 +1,7 @@
 import { env, SELF } from "cloudflare:test";
+import { createSession, hashToken } from "../src/lib/auth-session";
+
+export { hashToken };
 
 export const TEST_USER_EMAIL = "test@example.com";
 export const TEST_USER_B_EMAIL = "other@example.com";
@@ -73,6 +76,25 @@ export async function fetchJson(
     }
   }
   return { status, json: json as any };
+}
+
+export function sessionHeaders(token: string): Record<string, string> {
+  return { Cookie: `session=${token}` };
+}
+
+export async function seedSession(email: string = TEST_USER_EMAIL): Promise<{ token: string; userId: string }> {
+  await fetchJson("/api/v1/me", { headers: authHeaders(email) });
+  const user = await env.DB.prepare("SELECT id FROM users WHERE email = ?")
+    .bind(email).first<{ id: string }>();
+  const { token } = await createSession(env.DB, user!.id);
+  return { token, userId: user!.id };
+}
+
+export async function seedCredential(userId: string): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO passkey_credentials (id, user_id, public_key, webauthn_user_id, sign_count, transports, device_type, backed_up)
+     VALUES (?, ?, X'00', ?, 0, '["internal"]', 'multiDevice', 1)`,
+  ).bind("test-credential-id", userId, "test-webauthn-user-id").run();
 }
 
 export async function createBatch(overrides: Record<string, unknown> = {}, email?: string) {

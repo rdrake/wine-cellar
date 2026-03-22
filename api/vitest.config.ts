@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
 import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
 
 const migrationSql = readdirSync("./migrations")
@@ -8,6 +9,13 @@ const migrationSql = readdirSync("./migrations")
   .join("\n");
 
 export default defineWorkersConfig({
+  resolve: {
+    alias: {
+      // tslib's ESM wrapper does `import tslib from '../tslib.js'` which fails in workerd.
+      // Resolve directly to the pure ESM build instead.
+      tslib: resolve(__dirname, "node_modules/tslib/tslib.es6.mjs"),
+    },
+  },
   test: {
     poolOptions: {
       workers: {
