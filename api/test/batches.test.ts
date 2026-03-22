@@ -240,3 +240,28 @@ describe("winemaking intelligence on batch detail", () => {
     expect(json.timeline).toEqual([]);
   });
 });
+
+describe("cellaring intelligence", () => {
+  it("returns cellaring data for bottled batch", async () => {
+    const id = await createBatch({ wine_type: "red", source_material: "fresh_grapes" });
+    // Advance to bottling and complete
+    for (const _ of [1, 2, 3, 4]) {
+      await fetchJson(`/api/v1/batches/${id}/advance`, { method: "POST", headers: API_HEADERS });
+    }
+    await fetchJson(`/api/v1/batches/${id}/complete`, { method: "POST", headers: API_HEADERS });
+    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: API_HEADERS });
+    expect(json.bottled_at).toBeTruthy();
+    expect(json.cellaring).toBeTruthy();
+    expect(json.cellaring.readyDate).toBeTruthy();
+    expect(json.cellaring.peakStart).toBeTruthy();
+    expect(json.cellaring.storageNote).toBeTruthy();
+  });
+
+  it("does NOT return cellaring for completed batch without bottled_at", async () => {
+    const id = await createBatch();
+    await fetchJson(`/api/v1/batches/${id}/complete`, { method: "POST", headers: API_HEADERS });
+    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: API_HEADERS });
+    expect(json.bottled_at).toBeNull();
+    expect(json.cellaring).toBeNull();
+  });
+});

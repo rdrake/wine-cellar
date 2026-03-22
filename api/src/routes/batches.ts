@@ -4,7 +4,7 @@ import { BatchCreateSchema, BatchUpdateSchema, StageSetSchema } from "../models"
 import { notFound, conflict, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
 import { WAYPOINT_ORDER } from "../schema";
-import { generateNudges, projectTimeline } from "../lib/winemaking";
+import { generateNudges, projectTimeline, calculateDrinkWindow } from "../lib/winemaking";
 
 const batches = new Hono<AppEnv>();
 
@@ -76,9 +76,35 @@ batches.get("/:batchId", async (c) => {
   const row = await getOwnedBatch(db, batchId, userId);
   if (!row) return notFound("Batch");
 
-  // Non-active batches get empty arrays
+  // Non-active batches get empty nudges/timeline, plus cellaring if bottled
   if (row.status !== "active") {
-    return c.json({ ...row, nudges: [], timeline: [] });
+    let cellaring = null;
+    if (row.bottled_at) {
+      const [phRow, gravityRow] = await Promise.all([
+        db.prepare(
+          `SELECT json_extract(details, '$.value') as value FROM activities
+           WHERE batch_id = ? AND user_id = ? AND type = 'measurement'
+           AND json_extract(details, '$.metric') = 'pH'
+           ORDER BY recorded_at DESC LIMIT 1`
+        ).bind(batchId, userId).first<any>(),
+        db.prepare(
+          "SELECT gravity FROM readings WHERE batch_id = ? ORDER BY source_timestamp DESC LIMIT 1"
+        ).bind(batchId).first<any>(),
+      ]);
+
+      cellaring = calculateDrinkWindow({
+        wineType: row.wine_type,
+        sourceMaterial: row.source_material,
+        bottledAt: typeof row.bottled_at === "string" ? row.bottled_at.slice(0, 10) : row.bottled_at,
+        oakType: row.oak_type ?? null,
+        oakDurationDays: row.oak_duration_days ?? null,
+        mlfStatus: row.mlf_status ?? null,
+        totalSo2Ppm: null,
+        finalPh: phRow?.value != null ? Number(phRow.value) : null,
+        finalGravity: gravityRow?.gravity ?? null,
+      });
+    }
+    return c.json({ ...row, nudges: [], timeline: [], cellaring });
   }
 
   // Gather context data for nudges and timeline
