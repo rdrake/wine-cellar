@@ -23,8 +23,8 @@ export default defineWorkersConfig({
         miniflare: {
           d1Databases: { DB: "wine-cellar-test" },
           bindings: {
-            CF_ACCESS_AUD: "test-aud",
-            CF_ACCESS_TEAM: "test",
+            GITHUB_CLIENT_ID: "test-github-client-id",
+            GITHUB_CLIENT_SECRET: "test-github-client-secret",
             WEBHOOK_TOKEN: "test-webhook-token",
             VAPID_PUBLIC_KEY: "test-vapid-public-key",
             VAPID_PRIVATE_KEY: "test-vapid-private-key",

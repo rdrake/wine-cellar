@@ -12,17 +12,16 @@ import { batchReadings, deviceReadings } from "./routes/readings";
 
 export type Bindings = {
   DB: D1Database;
-  CF_ACCESS_AUD?: string;   // Recovery-only: set when CF Access is temporarily re-enabled
-  CF_ACCESS_TEAM: string;
+  GITHUB_CLIENT_ID: string;
+  GITHUB_CLIENT_SECRET: string;
   WEBHOOK_TOKEN: string;
   VAPID_PUBLIC_KEY: string;
   VAPID_PRIVATE_KEY: string;
-  SETUP_TOKEN?: string;     // Bootstrap: Wrangler secret for first-time setup
   RP_ID: string;            // WebAuthn relying party ID
   RP_ORIGIN: string;        // WebAuthn expected origin
 };
 
-export type User = { id: string; email: string; name: string | null };
+export type User = { id: string; email: string; name: string | null; avatar_url: string | null };
 
 export type AppEnv = { Bindings: Bindings; Variables: { user: User } };
 
@@ -32,11 +31,6 @@ const app = new Hono<AppEnv>();
 app.use("*", accessAuth);
 
 app.get("/health", (c) => c.json({ status: "ok" }));
-
-app.get("/api/v1/me", (c) => {
-  const user = c.get("user");
-  return c.json({ id: user.id, email: user.email, name: user.name });
-});
 
 app.route("/api/v1/batches", batches);
 app.route("/api/v1/batches/:batchId/activities", activities);

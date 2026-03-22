@@ -7,7 +7,7 @@ compatibility_date = "2025-11-02"
 mode = "smart"
 
 [vars]
-CF_ACCESS_TEAM = "rdrake"
+GITHUB_CLIENT_ID = ""
 RP_ID = "wine-cellar-dashboard.pages.dev"
 RP_ORIGIN = "https://wine-cellar-dashboard.pages.dev"
 
