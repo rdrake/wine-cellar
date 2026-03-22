@@ -66,12 +66,19 @@ function punchDown(ctx: NudgeContext): Nudge | null {
 
 function tempHighPrimary(ctx: NudgeContext): Nudge | null {
   if (ctx.stage !== "primary_fermentation") return null;
-  if (ctx.latestTemp == null || ctx.latestTemp < 29) return null;
+  if (ctx.latestTemp == null) return null;
+
+  const threshold = (ctx.wineType === "white" || ctx.wineType === "ros\u00e9") ? 20 : 29;
+  if (ctx.latestTemp < threshold) return null;
+
+  const guidance = threshold < 29
+    ? `stay under ${threshold}\u00b0C to preserve aromatics`
+    : `stay under ${threshold}\u00b0C`;
 
   return {
     id: "temp-high-primary",
     priority: "warning",
-    message: `Temperature is ${ctx.latestTemp}\u00b0C \u2014 stay under 29\u00b0C`,
+    message: `Temperature is ${ctx.latestTemp}\u00b0C \u2014 ${guidance}`,
     stage: ctx.stage,
   };
 }
@@ -85,6 +92,19 @@ function considerPressing(ctx: NudgeContext): Nudge | null {
     id: "consider-pressing",
     priority: "action",
     message: "Consider pressing \u2014 SG is approaching 1.010",
+    detail: "Typical skin contact: 5\u20137 days for a balanced red, 3\u20135 days for light/fruity, 7\u201310 days for full-bodied.",
+    stage: ctx.stage,
+  };
+}
+
+function considerPressingRose(ctx: NudgeContext): Nudge | null {
+  if (ctx.stage !== "primary_fermentation") return null;
+  if (ctx.wineType !== "ros\u00e9") return null;
+
+  return {
+    id: "consider-pressing-rose",
+    priority: "info",
+    message: "Press after 6\u201324 hours of skin contact, depending on desired color depth",
     stage: ctx.stage,
   };
 }
@@ -108,6 +128,17 @@ function mlfSuggestion(ctx: NudgeContext): Nudge | null {
   };
 }
 
+function so2MlfWarning(ctx: NudgeContext): Nudge | null {
+  if (ctx.mlfStatus !== "in_progress") return null;
+
+  return {
+    id: "so2-mlf-warning",
+    priority: "warning",
+    message: "Do not add SO2 while MLF is in progress — it will kill the malolactic bacteria",
+    stage: ctx.stage,
+  };
+}
+
 function so2Racking(ctx: NudgeContext): Nudge | null {
   if (ctx.stage !== "stabilization") return null;
 
@@ -122,11 +153,17 @@ function so2Racking(ctx: NudgeContext): Nudge | null {
 function bottlingChecklist(ctx: NudgeContext): Nudge | null {
   if (ctx.stage !== "bottling") return null;
 
+  const taRange =
+    ctx.wineType === "white" || ctx.wineType === "rosé"
+      ? "0.65–0.85"
+      : "0.60–0.80";
+
   return {
     id: "bottling-checklist",
     priority: "action",
     message:
-      "Final checks: SG below 0.998, free SO2 at 25\u201335 ppm, taste is clean",
+      "Final checks: SG below 0.998, free SO2 at 25–35 ppm, pH 3.2–3.6, taste is clean",
+    detail: `Target TA: ${taRange} g/100mL. pH above 3.6 increases spoilage risk.`,
     stage: ctx.stage,
   };
 }
@@ -137,7 +174,9 @@ const evaluators: Evaluator[] = [
   punchDown,
   tempHighPrimary,
   considerPressing,
+  considerPressingRose,
   mlfSuggestion,
+  so2MlfWarning,
   so2Racking,
   bottlingChecklist,
 ];

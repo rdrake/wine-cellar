@@ -12,6 +12,7 @@ function ctx(overrides: Partial<BatchAlertContext> = {}): BatchAlertContext {
     batchId: "batch-1",
     userId: "user-1",
     stage: "primary_fermentation",
+    wineType: "red",
     targetGravity: null,
     hasAssignedDevice: true,
     readings: [],
@@ -71,6 +72,46 @@ describe("evaluateAlerts", () => {
     expect(result.some((a) => a.type === "temp_high")).toBe(true);
   });
 
+  it("fires temp_high for white wine at 22°C", () => {
+    const readings = [
+      { gravity: 1.05, temperature: 22, source_timestamp: hoursAgo(1) },
+    ];
+    const result = evaluateAlerts(ctx({ wineType: "white", readings }));
+    expect(result.some((a) => a.type === "temp_high")).toBe(true);
+  });
+
+  it("does not fire temp_high for white wine at 21°C", () => {
+    const readings = [
+      { gravity: 1.05, temperature: 21, source_timestamp: hoursAgo(1) },
+    ];
+    const result = evaluateAlerts(ctx({ wineType: "white", readings }));
+    expect(result.some((a) => a.type === "temp_high")).toBe(false);
+  });
+
+  it("fires temp_high for rosé at 22°C", () => {
+    const readings = [
+      { gravity: 1.05, temperature: 22, source_timestamp: hoursAgo(1) },
+    ];
+    const result = evaluateAlerts(ctx({ wineType: "rosé", readings }));
+    expect(result.some((a) => a.type === "temp_high")).toBe(true);
+  });
+
+  it("does not fire temp_high for red wine at 29°C", () => {
+    const readings = [
+      { gravity: 1.05, temperature: 29, source_timestamp: hoursAgo(1) },
+    ];
+    const result = evaluateAlerts(ctx({ wineType: "red", readings }));
+    expect(result.some((a) => a.type === "temp_high")).toBe(false);
+  });
+
+  it("uses 30°C default for unknown wine type", () => {
+    const readings = [
+      { gravity: 1.05, temperature: 25, source_timestamp: hoursAgo(1) },
+    ];
+    const result = evaluateAlerts(ctx({ wineType: "sparkling", readings }));
+    expect(result.some((a) => a.type === "temp_high")).toBe(false);
+  });
+
   // ── temp_low ────────────────────────────────────────────────────────
   it("fires temp_low when latest temperature <= 8", () => {
     const readings = [
@@ -80,9 +121,9 @@ describe("evaluateAlerts", () => {
     expect(result.some((a) => a.type === "temp_low")).toBe(true);
   });
 
-  it("does not fire temp_low when temperature is 9", () => {
+  it("does not fire temp_low when temperature is above threshold", () => {
     const readings = [
-      { gravity: 1.05, temperature: 9, source_timestamp: hoursAgo(1) },
+      { gravity: 1.05, temperature: 11, source_timestamp: hoursAgo(1) },
     ];
     const result = evaluateAlerts(ctx({ readings }));
     expect(result.some((a) => a.type === "temp_low")).toBe(false);
@@ -94,6 +135,38 @@ describe("evaluateAlerts", () => {
     ];
     const result = evaluateAlerts(ctx({ readings }));
     expect(result.some((a) => a.type === "temp_low")).toBe(true);
+  });
+
+  it("fires temp_low for red wine at 10°C", () => {
+    const readings = [
+      { gravity: 1.05, temperature: 10, source_timestamp: hoursAgo(1) },
+    ];
+    const result = evaluateAlerts(ctx({ wineType: "red", readings }));
+    expect(result.some((a) => a.type === "temp_low")).toBe(true);
+  });
+
+  it("does not fire temp_low for red wine at 11°C", () => {
+    const readings = [
+      { gravity: 1.05, temperature: 11, source_timestamp: hoursAgo(1) },
+    ];
+    const result = evaluateAlerts(ctx({ wineType: "red", readings }));
+    expect(result.some((a) => a.type === "temp_low")).toBe(false);
+  });
+
+  it("does not fire temp_low for white wine at 10°C", () => {
+    const readings = [
+      { gravity: 1.05, temperature: 10, source_timestamp: hoursAgo(1) },
+    ];
+    const result = evaluateAlerts(ctx({ wineType: "white", readings }));
+    expect(result.some((a) => a.type === "temp_low")).toBe(false);
+  });
+
+  it("does not fire temp_low for white wine at 9°C", () => {
+    const readings = [
+      { gravity: 1.05, temperature: 9, source_timestamp: hoursAgo(1) },
+    ];
+    const result = evaluateAlerts(ctx({ wineType: "white", readings }));
+    expect(result.some((a) => a.type === "temp_low")).toBe(false);
   });
 
   it("skips temp checks when temperature is null", () => {

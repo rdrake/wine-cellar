@@ -28,6 +28,7 @@ export async function evaluateAllBatches(
       batchId: batch.id,
       userId: batch.user_id,
       stage: batch.stage,
+      wineType: batch.wine_type ?? "red",
       targetGravity: batch.target_gravity,
       hasAssignedDevice: !!device,
       readings: readings.results,

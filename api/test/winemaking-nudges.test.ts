@@ -116,6 +116,36 @@ describe("winemaking nudges", () => {
       );
       expect(findNudge(nudges, "temp-high-primary")).toBeNull();
     });
+
+    it("warns for white wine at 20°C", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "white", latestTemp: 20 })
+      );
+      const nudge = findNudge(nudges, "temp-high-primary");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.message).toContain("20");
+    });
+
+    it("does not warn for white wine at 17°C", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "white", latestTemp: 17 })
+      );
+      expect(findNudge(nudges, "temp-high-primary")).toBeNull();
+    });
+
+    it("warns for rosé at 20°C", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "rosé", latestTemp: 20 })
+      );
+      expect(findNudge(nudges, "temp-high-primary")).not.toBeNull();
+    });
+
+    it("does not warn for red wine at 20°C", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "red", latestTemp: 20 })
+      );
+      expect(findNudge(nudges, "temp-high-primary")).toBeNull();
+    });
   });
 
   describe("consider-pressing", () => {
@@ -141,6 +171,42 @@ describe("winemaking nudges", () => {
         makeContext({ stage: "primary_fermentation", wineType: "red", latestGravity: 1.05 })
       );
       expect(findNudge(nudges, "consider-pressing")).toBeNull();
+    });
+
+    it("includes skin contact guidance in detail for red", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "red", latestGravity: 1.015 })
+      );
+      const nudge = findNudge(nudges, "consider-pressing");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.detail).toBeDefined();
+      expect(nudge!.detail).toContain("skin contact");
+    });
+  });
+
+  describe("consider-pressing-rose", () => {
+    it("suggests pressing for rosé during primary fermentation", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "rosé" })
+      );
+      const nudge = findNudge(nudges, "consider-pressing-rose");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.priority).toBe("info");
+      expect(nudge!.message).toContain("6–24 hours");
+    });
+
+    it("does not show rosé pressing nudge for red wine", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "primary_fermentation", wineType: "red" })
+      );
+      expect(findNudge(nudges, "consider-pressing-rose")).toBeNull();
+    });
+
+    it("does not show rosé pressing nudge outside primary fermentation", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "secondary_fermentation", wineType: "rosé" })
+      );
+      expect(findNudge(nudges, "consider-pressing-rose")).toBeNull();
     });
   });
 
@@ -191,6 +257,47 @@ describe("winemaking nudges", () => {
     });
   });
 
+  describe("so2-mlf-warning", () => {
+    it("warns when MLF is in progress during secondary fermentation", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "secondary_fermentation", wineType: "red", mlfStatus: "in_progress" })
+      );
+      const nudge = findNudge(nudges, "so2-mlf-warning");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.priority).toBe("warning");
+      expect(nudge!.message).toContain("SO2");
+      expect(nudge!.message).toContain("MLF");
+    });
+
+    it("warns when MLF is in progress during stabilization", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "stabilization", wineType: "red", mlfStatus: "in_progress" })
+      );
+      expect(findNudge(nudges, "so2-mlf-warning")).not.toBeNull();
+    });
+
+    it("does not warn when MLF is complete", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "secondary_fermentation", wineType: "red", mlfStatus: "complete" })
+      );
+      expect(findNudge(nudges, "so2-mlf-warning")).toBeNull();
+    });
+
+    it("does not warn when MLF is not planned", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "secondary_fermentation", wineType: "red", mlfStatus: "not_planned" })
+      );
+      expect(findNudge(nudges, "so2-mlf-warning")).toBeNull();
+    });
+
+    it("does not warn when mlfStatus is null", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "secondary_fermentation", wineType: "red", mlfStatus: null })
+      );
+      expect(findNudge(nudges, "so2-mlf-warning")).toBeNull();
+    });
+  });
+
   describe("so2-racking", () => {
     it("shows SO2 nudge at stabilization", () => {
       const nudges = generateNudges(
@@ -213,6 +320,27 @@ describe("winemaking nudges", () => {
       expect(nudge!.priority).toBe("action");
       expect(nudge!.message).toContain("SG below 0.998");
       expect(nudge!.message).toContain("SO2");
+      expect(nudge!.message).toContain("pH");
+    });
+
+    it("includes red TA range for red wine", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "bottling", wineType: "red" })
+      );
+      const nudge = findNudge(nudges, "bottling-checklist");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.detail).toContain("0.60");
+      expect(nudge!.detail).toContain("0.80");
+    });
+
+    it("includes white TA range for white wine", () => {
+      const nudges = generateNudges(
+        makeContext({ stage: "bottling", wineType: "white" })
+      );
+      const nudge = findNudge(nudges, "bottling-checklist");
+      expect(nudge).not.toBeNull();
+      expect(nudge!.detail).toContain("0.65");
+      expect(nudge!.detail).toContain("0.85");
     });
   });
 
