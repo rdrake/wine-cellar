@@ -112,7 +112,7 @@ export function evaluateAlerts(ctx: BatchAlertContext): AlertCandidate[] {
     const v7d = velocity(readings, 168);
 
     // ── Stall detection ──────────────────────────────────────────────
-    if (v48 !== null && v7d !== null && latest.gravity >= 0.998 && latest.gravity > 1.005) {
+    if (v48 !== null && v7d !== null && latest.gravity >= 0.998) {
       const isFlat = Math.abs(v48) < 0.0005;
       const isSlowing = v7d !== 0 && Math.abs(v48) < Math.abs(v7d) * 0.2;
       if (isFlat || isSlowing) {

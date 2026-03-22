@@ -71,7 +71,7 @@ function SummaryStats({ batches }: { batches: BatchSummary[] }) {
   return (
     <p className="text-sm tabular-nums py-2 mb-1">
       <span className="font-semibold">{batches.length}</span> {batches.length === 1 ? "batch" : "batches"}
-      {totalLiters > 0 && <> · <span className="font-semibold">{totalLiters}</span> L</>}
+      {totalLiters > 0 && <> · <span className="font-semibold">{Math.round(totalLiters * 10) / 10}</span> L</>}
       {" · "}{dayRange}
     </p>
   );
@@ -167,11 +167,11 @@ function BatchRow({ batch }: { batch: BatchSummary & { _stalled?: boolean } }) {
             )}
           </div>
           {/* Temperature line */}
-          {temps.length >= 2 && (
+          {temps.length >= 2 && batch.latest_reading.temperature != null && (
             <div className="flex items-center gap-2">
               <TemperatureSparkline values={temps} width={140} height={24} />
               <span className="text-sm tabular-nums">
-                <span className="font-semibold">{batch.latest_reading.temperature!.toFixed(1)}</span>
+                <span className="font-semibold">{batch.latest_reading.temperature.toFixed(1)}</span>
                 <span className="text-muted-foreground text-xs">{"\u00B0C"}</span>
               </span>
             </div>

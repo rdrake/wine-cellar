@@ -30,7 +30,10 @@ export async function processAlerts(
 
   for (const candidate of candidates) {
     const id = crypto.randomUUID();
-    const contextJson = candidate.context ? JSON.stringify(candidate.context) : null;
+    const contextWithMessage = candidate.context
+      ? { ...candidate.context, ...(candidate.message ? { message: candidate.message } : {}) }
+      : candidate.message ? { message: candidate.message } : null;
+    const contextJson = contextWithMessage ? JSON.stringify(contextWithMessage) : null;
 
     // Check for any unresolved row (active OR dismissed) — dismissed alerts
     // should not re-fire until the condition resolves and clears them first.

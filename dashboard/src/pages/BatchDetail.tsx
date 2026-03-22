@@ -50,17 +50,17 @@ function BatchSnapshot({ batch, readings, device }: {
   readings: Reading[];
   device: Device | null;
 }) {
-  const sorted = readings.length >= 2
+  const sorted = readings.length >= 1
     ? [...readings].sort((a, b) => new Date(a.source_timestamp).getTime() - new Date(b.source_timestamp).getTime())
     : null;
 
   const latest = sorted ? sorted[sorted.length - 1] : null;
-  const og = sorted ? sorted[0].gravity : null;
+  const og = sorted && sorted.length >= 2 ? sorted[0].gravity : null;
   const sg = latest?.gravity ?? null;
   const currentAbv = og && sg ? abv(og, sg) : null;
   const att = og && sg ? attenuation(og, sg) : null;
-  const vel = sorted ? velocity(sorted) : null;
-  const temps = sorted ? tempStats(sorted) : null;
+  const vel = sorted && sorted.length >= 2 ? velocity(sorted) : null;
+  const temps = sorted && sorted.length >= 2 ? tempStats(sorted) : null;
   const days = daysSince(batch.started_at);
   const proj = vel !== null && sg !== null ? projectedDaysToTarget(sg, 0.996, vel) : null;
 
@@ -158,6 +158,11 @@ function LifecycleActions({ batch, batchId, onAction, onDeleted }: {
   const [confirmAction, setConfirmAction] = useState<{ label: string; verb: string; verbing: string; action: () => Promise<void> } | null>(null);
   const [acting, setActing] = useState(false);
   const [selectedStage, setSelectedStage] = useState<BatchStage>(nextStage(batch.stage));
+
+  // Sync selectedStage when batch.stage changes (e.g. after a successful stage set)
+  useEffect(() => {
+    setSelectedStage(nextStage(batch.stage));
+  }, [batch.stage]);
 
   async function doAction(label: string, action: () => Promise<Batch>) {
     setActing(true);
@@ -388,7 +393,7 @@ export default function BatchDetail() {
             readings={readingsData?.items.slice().reverse() ?? []}
             activities={activitiesData?.items}
             batchStartedAt={batch.started_at}
-            loading={!readingsData && !error}
+            loading={!readingsData && !error && !loading}
             error={null}
           />
 
