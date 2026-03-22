@@ -11,12 +11,14 @@ import { batchReadings, deviceReadings } from "./routes/readings";
 
 export type Bindings = {
   DB: D1Database;
-  CF_ACCESS_AUD: string;
+  CF_ACCESS_AUD?: string;   // Recovery-only: set when CF Access is temporarily re-enabled
   CF_ACCESS_TEAM: string;
   WEBHOOK_TOKEN: string;
   VAPID_PUBLIC_KEY: string;
   VAPID_PRIVATE_KEY: string;
-  API_KEY?: string; // Legacy — kept during rollout, removed after
+  SETUP_TOKEN?: string;     // Bootstrap: Wrangler secret for first-time setup
+  RP_ID: string;            // WebAuthn relying party ID
+  RP_ORIGIN: string;        // WebAuthn expected origin
 };
 
 export type User = { id: string; email: string; name: string | null };

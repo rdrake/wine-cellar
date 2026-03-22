@@ -19,6 +19,13 @@ export function unauthorized(message: string) {
   );
 }
 
+export function forbidden(message: string) {
+  return Response.json(
+    { error: "forbidden", message },
+    { status: 403 },
+  );
+}
+
 export function validationError(detail: unknown) {
   return Response.json(
     { error: "validation_error", detail },

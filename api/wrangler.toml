@@ -8,6 +8,8 @@ mode = "smart"
 
 [vars]
 CF_ACCESS_TEAM = "rdrake"
+RP_ID = "wine-cellar-dashboard.pages.dev"
+RP_ORIGIN = "https://wine-cellar-dashboard.pages.dev"
 
 [[d1_databases]]
 binding = "DB"

@@ -6,7 +6,7 @@ type User = { id: string; email: string; name: string | null };
 
 type AccessBindings = {
   DB: D1Database;
-  CF_ACCESS_AUD: string;
+  CF_ACCESS_AUD?: string;
   CF_ACCESS_TEAM: string;
   WEBHOOK_TOKEN: string;
 };
@@ -25,6 +25,7 @@ export const accessAuth = createMiddleware<{
   // Cloudflare Access JWT (browser or service token)
   const jwt = c.req.header("Cf-Access-Jwt-Assertion");
   if (!jwt) return unauthorized("Missing access token");
+  if (!c.env.CF_ACCESS_AUD) return unauthorized("Access auth not configured");
 
   const result = await verifyAccessJwt(jwt, c.env.CF_ACCESS_AUD, c.env.CF_ACCESS_TEAM);
   if (!result) return unauthorized("Invalid access token");
