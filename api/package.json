@@ -2,6 +2,7 @@
   "name": "wine-cellar-api",
   "version": "0.1.0",
   "private": true,
+  "license": "ISC",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
