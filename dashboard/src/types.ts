@@ -52,6 +52,7 @@ export interface Batch {
   cellaring?: DrinkWindow | null;
   nudges?: Nudge[];
   timeline?: Milestone[];
+  currentPhase?: CurrentPhase | null;
 }
 
 export interface Activity {
@@ -151,6 +152,13 @@ export interface Milestone {
   basis: string;
   confidence: "firm" | "estimated" | "rough";
   completed?: boolean;
+}
+
+export interface CurrentPhase {
+  label: string;
+  stage: string;
+  daysElapsed: number;
+  estimatedTotalDays: number | null;
 }
 
 export interface BatchCreate {
