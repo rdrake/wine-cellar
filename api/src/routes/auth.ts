@@ -445,7 +445,7 @@ auth.post("/register", async (c) => {
     existingCred?.webauthn_user_id ??
     base64UrlEncode(crypto.getRandomValues(new Uint8Array(64)).buffer);
 
-  const credentialName = body.name && typeof body.name === "string" ? body.name.trim().slice(0, 100) : null;
+  const credentialName = body.name && typeof body.name === "string" ? body.name.trim().slice(0, 100) || null : null;
 
   // Store credential
   await db
