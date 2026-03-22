@@ -48,14 +48,12 @@ export function DeviceCard({ device, batchName, onAssign, onUnassign }: DeviceCa
           </div>
         </div>
 
-        {/* Batch assignment */}
         {batchName && (
           <p className="text-xs text-muted-foreground mt-1">
             Monitoring: <span className="font-medium text-foreground">{batchName}</span>
           </p>
         )}
 
-        {/* Sensor status strip */}
         {latest ? (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             <span className="tabular-nums">
@@ -86,7 +84,6 @@ export function DeviceCard({ device, batchName, onAssign, onUnassign }: DeviceCa
           <p className="text-xs text-muted-foreground mt-2">No readings received yet</p>
         )}
 
-        {/* Mini sparkline */}
         {readings.length >= 2 && (
           <div className="mt-2">
             <GravitySparkline values={readings.map((r) => r.gravity)} width={200} height={24} />

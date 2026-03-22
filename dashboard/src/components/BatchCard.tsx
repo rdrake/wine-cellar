@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
-import { differenceInCalendarDays } from "date-fns";
 import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
-import { parseUtc } from "@/lib/dates";
+import { daysSince } from "@/lib/fermentation";
 import { GravitySparkline, TemperatureSparkline } from "@/components/Sparkline";
 import { cn } from "@/lib/utils";
 import type { Batch } from "@/types";
@@ -72,7 +71,7 @@ export default function BatchCard({ batch }: { batch: Batch }) {
       <p className="text-xs text-muted-foreground tabular-nums mt-0.5">
         {WINE_TYPE_LABELS[batch.wine_type]}
         {batch.volume_liters && <> · {batch.volume_liters} L</>}
-        {batch.started_at && <> · Day {differenceInCalendarDays(new Date(), parseUtc(batch.started_at))}</>}
+        {batch.started_at && <> · Day {daysSince(batch.started_at)}</>}
       </p>
       <BatchSparkline batchId={batch.id} />
     </Link>

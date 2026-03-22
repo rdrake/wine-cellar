@@ -111,7 +111,6 @@ export function PasskeysSection() {
         </div>
       ))}
 
-      {/* Name prompt dialog */}
       <Dialog open={showNamePrompt} onOpenChange={(open) => { if (!open) { setShowNamePrompt(false); setNewPasskeyName(""); } }}>
         <DialogContent>
           <DialogHeader>
@@ -135,7 +134,6 @@ export function PasskeysSection() {
         </DialogContent>
       </Dialog>
 
-      {/* Last passkey warning dialog */}
       <Dialog open={!!confirmRevoke} onOpenChange={(open) => { if (!open) setConfirmRevoke(null); }}>
         <DialogContent>
           <DialogHeader>

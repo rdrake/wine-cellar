@@ -91,7 +91,6 @@ export function ApiKeysSection() {
         </div>
       ))}
 
-      {/* Create dialog */}
       <Dialog open={showCreate && !createdKey} onOpenChange={(open) => { if (!open) { setShowCreate(false); setNewKeyName(""); } }}>
         <DialogContent>
           <DialogHeader>
@@ -115,7 +114,6 @@ export function ApiKeysSection() {
         </DialogContent>
       </Dialog>
 
-      {/* Show key dialog */}
       <Dialog open={!!createdKey} onOpenChange={(open) => { if (!open) { setCreatedKey(null); setShowCreate(false); } }}>
         <DialogContent>
           <DialogHeader>

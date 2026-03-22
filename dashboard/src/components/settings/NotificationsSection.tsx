@@ -3,15 +3,16 @@ import { api } from "@/api";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+const supported = "serviceWorker" in navigator && "PushManager" in window;
+
 export function NotificationsSection() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check current subscription state on mount
   useEffect(() => {
     async function check() {
       try {
-        if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        if (!supported) {
           setEnabled(false);
           setLoading(false);
           return;
@@ -75,8 +76,6 @@ export function NotificationsSection() {
     }
     setLoading(false);
   }
-
-  const supported = "serviceWorker" in navigator && "PushManager" in window;
 
   return (
     <div className="flex flex-col gap-2">
