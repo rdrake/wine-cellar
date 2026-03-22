@@ -25,6 +25,8 @@ import ActivitySection from "@/components/ActivitySection";
 import ReadingsChart from "@/components/ReadingsChart";
 import DeviceSection from "@/components/DeviceSection";
 import ExportButton from "@/components/ExportButton";
+import NudgeBar from "@/components/NudgeBar";
+import BatchTimeline from "@/components/BatchTimeline";
 import { abv, attenuation, velocity, tempStats, daysSince, projectedDaysToTarget } from "@/lib/fermentation";
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -389,6 +391,11 @@ export default function BatchDetail() {
             device={assignedDevice}
           />
 
+          {/* Nudges — actionable suggestions for active batches */}
+          {batch.status === "active" && batch.nudges && batch.nudges.length > 0 && (
+            <NudgeBar nudges={batch.nudges} />
+          )}
+
           {/* 3. Readings chart — hero visual */}
           <ReadingsChart
             readings={readingsData?.items.slice().reverse() ?? []}
@@ -397,6 +404,11 @@ export default function BatchDetail() {
             loading={!readingsData && !error}
             error={null}
           />
+
+          {/* Projected timeline for active batches */}
+          {batch.status === "active" && batch.timeline && batch.timeline.length > 0 && (
+            <BatchTimeline milestones={batch.timeline} />
+          )}
 
           {/* 4. Primary actions — promoted */}
           <LifecycleActions

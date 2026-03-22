@@ -40,6 +40,8 @@ export interface Batch {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  nudges?: Nudge[];
+  timeline?: Milestone[];
 }
 
 export interface Activity {
@@ -114,6 +116,22 @@ export interface Alert {
   alert_type: string;
   context: string | null;
   fired_at: string;
+}
+
+export interface Nudge {
+  id: string;
+  priority: "info" | "warning" | "action";
+  message: string;
+  detail?: string;
+  stage: string;
+}
+
+export interface Milestone {
+  label: string;
+  estimated_date: string;
+  basis: string;
+  confidence: "firm" | "estimated" | "rough";
+  completed?: boolean;
 }
 
 export interface BatchCreate {
