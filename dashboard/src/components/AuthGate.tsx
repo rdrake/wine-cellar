@@ -17,6 +17,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthGate");
@@ -41,7 +42,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setOnUnauthorized(() => setState({ authenticated: false }));
-    refreshAuth();
+    refreshAuth(); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
 
   if (state === null) {

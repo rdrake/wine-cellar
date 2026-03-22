@@ -5,7 +5,7 @@ export function base64UrlDecode(s: string): Uint8Array {
   return Uint8Array.from(binary, (c) => c.charCodeAt(0));
 }
 
-export function base64UrlEncode(buf: ArrayBuffer): string {
+export function base64UrlEncode(buf: ArrayBuffer | Uint8Array): string {
   const bytes = new Uint8Array(buf);
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);

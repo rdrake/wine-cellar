@@ -14,9 +14,7 @@ const EXEMPT_PREFIXES = [
 function isExempt(path: string): boolean {
   return EXEMPT_PREFIXES.some(
     (prefix) =>
-      path === prefix ||
-      path.startsWith(prefix + "/") ||
-      path.startsWith(prefix + "?"),
+      path === prefix || path.startsWith(prefix + "/"),
   );
 }
 
