@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
-import { applyMigrations, fetchJson, createBatch, API_HEADERS, WEBHOOK_HEADERS } from "./helpers";
+import { applyMigrations, fetchJson, createBatch, authHeaders, WEBHOOK_HEADERS } from "./helpers";
 
 const VALID_PAYLOAD = {
   device_id: "pill-abc-123",
@@ -37,8 +37,9 @@ describe("webhook", () => {
   });
 
   it("resolves batch from device", async () => {
+    const headers = await authHeaders();
     const { json: batch } = await fetchJson("/api/v1/batches", {
-      method: "POST", headers: API_HEADERS,
+      method: "POST", headers,
       body: { name: "Test", wine_type: "red", source_material: "kit", started_at: "2026-03-19T10:00:00Z" },
     });
     await env.DB.prepare(
@@ -89,9 +90,9 @@ describe("webhook", () => {
 
   it("fires temp_high alert on hot reading", async () => {
     const batchId = await createBatch();
-    const { json: me } = await fetchJson("/api/v1/me", { headers: API_HEADERS });
+    const user = await env.DB.prepare("SELECT id FROM users WHERE email = 'test@example.com'").first<{ id: string }>();
     await env.DB.prepare("INSERT INTO devices (id, name, user_id, batch_id, assigned_at, created_at, updated_at) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))")
-      .bind("hot-pill", "Hot Pill", me.id, batchId).run();
+      .bind("hot-pill", "Hot Pill", user!.id, batchId).run();
 
     await fetchJson("/webhook/rapt", {
       method: "POST",

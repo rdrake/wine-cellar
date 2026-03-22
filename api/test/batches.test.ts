@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { applyMigrations, fetchJson, createBatch, authHeaders, API_HEADERS, VALID_BATCH } from "./helpers";
+import { applyMigrations, fetchJson, createBatch, authHeaders, VALID_BATCH } from "./helpers";
 
 beforeEach(async () => {
   await applyMigrations();
@@ -9,7 +9,7 @@ describe("batches CRUD", () => {
   it("creates a batch", async () => {
     const { status, json } = await fetchJson("/api/v1/batches", {
       method: "POST",
-      headers: API_HEADERS,
+      headers: await authHeaders(),
       body: VALID_BATCH,
     });
     expect(status).toBe(201);
@@ -22,7 +22,7 @@ describe("batches CRUD", () => {
   it("rejects invalid wine type", async () => {
     const { status } = await fetchJson("/api/v1/batches", {
       method: "POST",
-      headers: API_HEADERS,
+      headers: await authHeaders(),
       body: { ...VALID_BATCH, wine_type: "beer" },
     });
     expect(status).toBe(422);
@@ -31,7 +31,7 @@ describe("batches CRUD", () => {
   it("gets a batch", async () => {
     const batchId = await createBatch();
     const { status, json } = await fetchJson(`/api/v1/batches/${batchId}`, {
-      headers: API_HEADERS,
+      headers: await authHeaders(),
     });
     expect(status).toBe(200);
     expect(json.id).toBe(batchId);
@@ -39,14 +39,14 @@ describe("batches CRUD", () => {
 
   it("returns 404 for missing batch", async () => {
     const { status } = await fetchJson("/api/v1/batches/nonexistent", {
-      headers: API_HEADERS,
+      headers: await authHeaders(),
     });
     expect(status).toBe(404);
   });
 
   it("lists batches empty", async () => {
     const { status, json } = await fetchJson("/api/v1/batches", {
-      headers: API_HEADERS,
+      headers: await authHeaders(),
     });
     expect(status).toBe(200);
     expect(json.items).toEqual([]);
@@ -56,7 +56,7 @@ describe("batches CRUD", () => {
     await createBatch();
     await createBatch({ name: "Chardonnay", wine_type: "white" });
     const { json } = await fetchJson("/api/v1/batches?wine_type=red", {
-      headers: API_HEADERS,
+      headers: await authHeaders(),
     });
     expect(json.items).toHaveLength(1);
     expect(json.items[0].wine_type).toBe("red");
@@ -66,7 +66,7 @@ describe("batches CRUD", () => {
     const batchId = await createBatch();
     const { status, json } = await fetchJson(`/api/v1/batches/${batchId}`, {
       method: "PATCH",
-      headers: API_HEADERS,
+      headers: await authHeaders(),
       body: { name: "Updated Name", notes: "New notes" },
     });
     expect(status).toBe(200);
@@ -77,7 +77,7 @@ describe("batches CRUD", () => {
     const batchId = await createBatch();
     const { status } = await fetchJson(`/api/v1/batches/${batchId}`, {
       method: "DELETE",
-      headers: API_HEADERS,
+      headers: await authHeaders(),
     });
     expect(status).toBe(204);
   });
@@ -85,14 +85,14 @@ describe("batches CRUD", () => {
   it("returns 404 deleting missing batch", async () => {
     const { status } = await fetchJson("/api/v1/batches/nonexistent", {
       method: "DELETE",
-      headers: API_HEADERS,
+      headers: await authHeaders(),
     });
     expect(status).toBe(404);
   });
 
   it("creates batch with target_gravity", async () => {
     const { status, json } = await fetchJson("/api/v1/batches", {
-      method: "POST", headers: API_HEADERS,
+      method: "POST", headers: await authHeaders(),
       body: { ...VALID_BATCH, target_gravity: 0.996 },
     });
     expect(status).toBe(201);
@@ -102,7 +102,7 @@ describe("batches CRUD", () => {
   it("updates target_gravity", async () => {
     const batchId = await createBatch();
     const { status, json } = await fetchJson(`/api/v1/batches/${batchId}`, {
-      method: "PATCH", headers: API_HEADERS, body: { target_gravity: 1.000 },
+      method: "PATCH", headers: await authHeaders(), body: { target_gravity: 1.000 },
     });
     expect(status).toBe(200);
     expect(json.target_gravity).toBe(1.0);
@@ -112,11 +112,11 @@ describe("batches CRUD", () => {
     const idA = await createBatch({ name: "User A Batch" }, "a@example.com");
     const idB = await createBatch({ name: "User B Batch" }, "b@example.com");
 
-    const { json: listA } = await fetchJson("/api/v1/batches", { headers: authHeaders("a@example.com") });
+    const { json: listA } = await fetchJson("/api/v1/batches", { headers: await authHeaders("a@example.com") });
     expect(listA.items).toHaveLength(1);
     expect(listA.items[0].name).toBe("User A Batch");
 
-    const { status } = await fetchJson(`/api/v1/batches/${idB}`, { headers: authHeaders("a@example.com") });
+    const { status } = await fetchJson(`/api/v1/batches/${idB}`, { headers: await authHeaders("a@example.com") });
     expect(status).toBe(404);
   });
 });
@@ -125,7 +125,7 @@ describe("winemaking metadata", () => {
   it("creates batch with winemaking fields", async () => {
     const { status, json } = await fetchJson("/api/v1/batches", {
       method: "POST",
-      headers: API_HEADERS,
+      headers: await authHeaders(),
       body: {
         ...VALID_BATCH,
         yeast_strain: "EC-1118",
@@ -147,7 +147,7 @@ describe("winemaking metadata", () => {
     const batchId = await createBatch();
     const { status, json } = await fetchJson(`/api/v1/batches/${batchId}`, {
       method: "PATCH",
-      headers: API_HEADERS,
+      headers: await authHeaders(),
       body: {
         yeast_strain: "D47",
         oak_type: "american",
@@ -167,7 +167,7 @@ describe("winemaking metadata", () => {
   it("rejects invalid oak_type", async () => {
     const { status } = await fetchJson("/api/v1/batches", {
       method: "POST",
-      headers: API_HEADERS,
+      headers: await authHeaders(),
       body: { ...VALID_BATCH, oak_type: "bamboo" },
     });
     expect(status).toBe(422);
@@ -176,7 +176,7 @@ describe("winemaking metadata", () => {
   it("rejects invalid mlf_status", async () => {
     const { status } = await fetchJson("/api/v1/batches", {
       method: "POST",
-      headers: API_HEADERS,
+      headers: await authHeaders(),
       body: { ...VALID_BATCH, mlf_status: "unknown" },
     });
     expect(status).toBe(422);
@@ -184,20 +184,21 @@ describe("winemaking metadata", () => {
 
   it("sets bottled_at when completing from bottling stage", async () => {
     const batchId = await createBatch();
+    const headers = await authHeaders();
     // Advance through all stages to bottling
-    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers: API_HEADERS });
-    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers: API_HEADERS });
-    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers: API_HEADERS });
-    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers: API_HEADERS });
+    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers });
+    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers });
+    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers });
+    await fetchJson(`/api/v1/batches/${batchId}/advance`, { method: "POST", headers });
 
     // Verify we're at bottling
-    const { json: batch } = await fetchJson(`/api/v1/batches/${batchId}`, { headers: API_HEADERS });
+    const { json: batch } = await fetchJson(`/api/v1/batches/${batchId}`, { headers });
     expect(batch.stage).toBe("bottling");
 
     // Complete from bottling
     const { json: completed } = await fetchJson(`/api/v1/batches/${batchId}/complete`, {
       method: "POST",
-      headers: API_HEADERS,
+      headers,
     });
     expect(completed.bottled_at).toBeTruthy();
   });
@@ -207,7 +208,7 @@ describe("winemaking metadata", () => {
     // Complete from must_prep (initial stage)
     const { json: completed } = await fetchJson(`/api/v1/batches/${batchId}/complete`, {
       method: "POST",
-      headers: API_HEADERS,
+      headers: await authHeaders(),
     });
     expect(completed.bottled_at).toBeNull();
   });
@@ -216,7 +217,7 @@ describe("winemaking metadata", () => {
 describe("winemaking intelligence on batch detail", () => {
   it("returns nudges array on active batch", async () => {
     const id = await createBatch();
-    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: API_HEADERS });
+    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: await authHeaders() });
     expect(json.nudges).toBeDefined();
     expect(Array.isArray(json.nudges)).toBe(true);
     expect(json.nudges.length).toBeGreaterThan(0);
@@ -227,15 +228,16 @@ describe("winemaking intelligence on batch detail", () => {
 
   it("returns timeline array on active batch", async () => {
     const id = await createBatch();
-    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: API_HEADERS });
+    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: await authHeaders() });
     expect(json.timeline).toBeDefined();
     expect(Array.isArray(json.timeline)).toBe(true);
   });
 
   it("does NOT return nudges/timeline on completed batch", async () => {
     const id = await createBatch();
-    await fetchJson(`/api/v1/batches/${id}/complete`, { method: "POST", headers: API_HEADERS });
-    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: API_HEADERS });
+    const headers = await authHeaders();
+    await fetchJson(`/api/v1/batches/${id}/complete`, { method: "POST", headers });
+    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers });
     expect(json.nudges).toEqual([]);
     expect(json.timeline).toEqual([]);
   });
@@ -244,12 +246,13 @@ describe("winemaking intelligence on batch detail", () => {
 describe("cellaring intelligence", () => {
   it("returns cellaring data for bottled batch", async () => {
     const id = await createBatch({ wine_type: "red", source_material: "fresh_grapes" });
+    const headers = await authHeaders();
     // Advance to bottling and complete
     for (const _ of [1, 2, 3, 4]) {
-      await fetchJson(`/api/v1/batches/${id}/advance`, { method: "POST", headers: API_HEADERS });
+      await fetchJson(`/api/v1/batches/${id}/advance`, { method: "POST", headers });
     }
-    await fetchJson(`/api/v1/batches/${id}/complete`, { method: "POST", headers: API_HEADERS });
-    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: API_HEADERS });
+    await fetchJson(`/api/v1/batches/${id}/complete`, { method: "POST", headers });
+    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers });
     expect(json.bottled_at).toBeTruthy();
     expect(json.cellaring).toBeTruthy();
     expect(json.cellaring.readyDate).toBeTruthy();
@@ -259,8 +262,9 @@ describe("cellaring intelligence", () => {
 
   it("does NOT return cellaring for completed batch without bottled_at", async () => {
     const id = await createBatch();
-    await fetchJson(`/api/v1/batches/${id}/complete`, { method: "POST", headers: API_HEADERS });
-    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers: API_HEADERS });
+    const headers = await authHeaders();
+    await fetchJson(`/api/v1/batches/${id}/complete`, { method: "POST", headers });
+    const { json } = await fetchJson(`/api/v1/batches/${id}`, { headers });
     expect(json.bottled_at).toBeNull();
     expect(json.cellaring).toBeNull();
   });

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
-import { applyMigrations, TEST_USER_EMAIL, authHeaders, fetchJson } from "./helpers";
+import { applyMigrations, seedSession } from "./helpers";
 import { createSession, validateSession, deleteSession, cleanupExpiredSessions, hashToken } from "../src/lib/auth-session";
 import { storeChallenge, consumeChallenge, cleanupExpiredChallenges } from "../src/lib/auth-challenge";
 
@@ -9,10 +9,8 @@ describe("auth session helpers", () => {
 
   beforeEach(async () => {
     await applyMigrations();
-    await fetchJson("/api/v1/me", { headers: authHeaders() });
-    const user = await env.DB.prepare("SELECT id FROM users WHERE email = ?")
-      .bind(TEST_USER_EMAIL).first<{ id: string }>();
-    userId = user!.id;
+    const session = await seedSession();
+    userId = session.userId;
   });
 
   it("creates and validates a session", async () => {
@@ -48,7 +46,9 @@ describe("auth session helpers", () => {
       .bind(hash).run();
     await cleanupExpiredSessions(env.DB);
     const row = await env.DB.prepare("SELECT COUNT(*) as count FROM auth_sessions").first<{ count: number }>();
-    expect(row!.count).toBe(0);
+    // seedSession creates one session, plus we created another that got expired
+    // After cleanup, only the seedSession one (still valid) should remain
+    expect(row!.count).toBe(1);
   });
 });
 
@@ -73,7 +73,7 @@ describe("auth challenge helpers", () => {
 
   it("returns null for wrong type", async () => {
     const challengeId = await storeChallenge(env.DB, "test-challenge", "login");
-    const result = await consumeChallenge(env.DB, challengeId, "bootstrap");
+    const result = await consumeChallenge(env.DB, challengeId, "oauth");
     expect(result).toBeNull();
   });
 
@@ -100,6 +100,12 @@ describe("auth challenge helpers", () => {
     const count = await env.DB.prepare("SELECT COUNT(*) as count FROM auth_challenges").first<{ count: number }>();
     expect(count!.count).toBe(1);
     const result = await consumeChallenge(env.DB, activeId, "login");
+    expect(result).not.toBeNull();
+  });
+
+  it("supports configurable TTL", async () => {
+    const id = await storeChallenge(env.DB, "test-challenge", "oauth", undefined, 10);
+    const result = await consumeChallenge(env.DB, id, "oauth");
     expect(result).not.toBeNull();
   });
 });

@@ -6,21 +6,21 @@ export { hashToken };
 export const TEST_USER_EMAIL = "test@example.com";
 export const TEST_USER_B_EMAIL = "other@example.com";
 
-export function authHeaders(email: string = TEST_USER_EMAIL): Record<string, string> {
-  return { "Cf-Access-Jwt-Assertion": `test-jwt-for:${email}` };
+export async function authHeaders(email: string = TEST_USER_EMAIL): Promise<Record<string, string>> {
+  const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first<{ id: string }>();
+  let userId: string;
+  if (existing) {
+    userId = existing.id;
+  } else {
+    userId = crypto.randomUUID();
+    await env.DB.prepare(
+      "INSERT INTO users (id, email, name, onboarded) VALUES (?, ?, ?, 1)"
+    ).bind(userId, email, email.split("@")[0]).run();
+  }
+  const { token } = await createSession(env.DB, userId);
+  return { Cookie: `session=${token}` };
 }
 
-export function serviceTokenHeaders(clientId: string): Record<string, string> {
-  return { "Cf-Access-Jwt-Assertion": `test-jwt-for:st:${clientId}` };
-}
-
-export async function linkServiceToken(clientId: string, userId: string) {
-  await env.DB.prepare("INSERT INTO service_tokens (client_id, user_id, label) VALUES (?, ?, ?)")
-    .bind(clientId, userId, "test-token")
-    .run();
-}
-
-export const API_HEADERS = authHeaders(); // backward compat alias
 export const WEBHOOK_HEADERS = { "X-Webhook-Token": "test-webhook-token" };
 
 export const VALID_BATCH = {
@@ -83,11 +83,18 @@ export function sessionHeaders(token: string): Record<string, string> {
 }
 
 export async function seedSession(email: string = TEST_USER_EMAIL): Promise<{ token: string; userId: string }> {
-  await fetchJson("/api/v1/me", { headers: authHeaders(email) });
-  const user = await env.DB.prepare("SELECT id FROM users WHERE email = ?")
-    .bind(email).first<{ id: string }>();
-  const { token } = await createSession(env.DB, user!.id);
-  return { token, userId: user!.id };
+  const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first<{ id: string }>();
+  let userId: string;
+  if (existing) {
+    userId = existing.id;
+  } else {
+    userId = crypto.randomUUID();
+    await env.DB.prepare(
+      "INSERT INTO users (id, email, name, onboarded) VALUES (?, ?, ?, 1)"
+    ).bind(userId, email, email.split("@")[0]).run();
+  }
+  const { token } = await createSession(env.DB, userId);
+  return { token, userId };
 }
 
 // A valid base64url-encoded webauthn user ID for testing
@@ -101,9 +108,10 @@ export async function seedCredential(userId: string): Promise<void> {
 }
 
 export async function createBatch(overrides: Record<string, unknown> = {}, email?: string) {
+  const headers = await authHeaders(email);
   const { json } = await fetchJson("/api/v1/batches", {
     method: "POST",
-    headers: authHeaders(email),
+    headers,
     body: { ...VALID_BATCH, ...overrides },
   });
   return json.id as string;
