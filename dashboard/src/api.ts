@@ -1,7 +1,7 @@
 import type {
   Batch, BatchCreate, BatchUpdate, BatchStatus, BatchStage, WineType,
   Activity, ActivityCreate, ActivityUpdate, ActivityType, AllStage,
-  Reading, Device,
+  Reading, Device, Passkey,
   ListResponse, PaginatedResponse, DashboardResponse,
 } from "./types";
 import type {
@@ -133,10 +133,16 @@ export const api = {
       apiFetch<{ status: string }>("/api/v1/auth/login", { method: "POST", body: data }),
     registerOptions: () =>
       apiFetch<{ challengeId: string; options: PublicKeyCredentialCreationOptionsJSON }>("/api/v1/auth/register/options", { method: "POST" }),
-    register: (data: { challengeId: string; credential: unknown }) =>
+    register: (data: { challengeId: string; credential: unknown; name?: string }) =>
       apiFetch<{ status: string }>("/api/v1/auth/register", { method: "POST", body: data }),
     logout: () =>
       apiFetch<{ status: string }>("/api/v1/auth/logout", { method: "POST" }),
+    passkeys: {
+      list: () =>
+        apiFetch<ListResponse<Passkey>>("/api/v1/auth/passkeys"),
+      revoke: (id: string) =>
+        apiFetch<void>(`/api/v1/auth/passkeys/${id}`, { method: "DELETE" }),
+    },
     apiKeys: {
       list: () =>
         apiFetch<{ items: Array<{ id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }> }>("/api/v1/auth/api-keys"),

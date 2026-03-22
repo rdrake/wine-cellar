@@ -88,6 +88,15 @@ export interface Device {
   updated_at: string;
 }
 
+export interface Passkey {
+  id: string;
+  name: string | null;
+  deviceType: string | null;
+  backedUp: boolean;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 export interface ListResponse<T> {
   items: T[];
 }
