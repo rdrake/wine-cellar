@@ -1,9 +1,6 @@
-// api/src/lib/winemaking/alerts.ts — Timeline-driven alert evaluator (pure function)
-
 import type { AlertCandidate, AlertType } from "../alerts";
 
 export interface TimelineAlertContext {
-  batchId: string;
   batchName: string;
   rackingCount: number;
   lastRackingAt: string | null;

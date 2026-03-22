@@ -15,8 +15,6 @@ export interface NudgeContext {
   latestGravity: number | null;
   latestTemp: number | null;
   totalSo2Additions: number;
-  lastSo2AddedAt: string | null;
-  hasRackingActivity: boolean;
 }
 
 type Evaluator = (ctx: NudgeContext) => Nudge | null;

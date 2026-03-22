@@ -45,4 +45,7 @@ export const WAYPOINT_ALLOWED_STAGES: Record<BatchStage, readonly AllStage[]> = 
   bottling: ["bottling", "bottle_aging"],
 };
 
+export const SO2_CHEMICALS = ["K2S2O5", "SO2", "Campden", "K-meta", "Potassium metabisulfite"] as const;
+export const MLF_CULTURES = ["MLB", "Leuconostoc", "CH16", "VP41", "malolactic"] as const;
+
 export const WAYPOINT_ORDER: readonly BatchStage[] = BATCH_STAGES;

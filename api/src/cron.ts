@@ -1,6 +1,6 @@
 import { evaluateAlerts, type BatchAlertContext } from "./lib/alerts";
 import { processAlerts, resolveCleared, sendAlertPushes } from "./lib/alert-manager";
-import { projectTimeline, evaluateTimelineAlerts } from "./lib/winemaking";
+import { projectTimeline, evaluateTimelineAlerts, fetchWinemakingActivityContext, computeVelocityPerDay } from "./lib/winemaking";
 
 export async function evaluateAllBatches(
   db: D1Database,
@@ -12,13 +12,17 @@ export async function evaluateAllBatches(
   ).all<any>();
 
   for (const batch of batches.results) {
-    const device = await db.prepare(
-      "SELECT id FROM devices WHERE batch_id = ? AND user_id = ? LIMIT 1"
-    ).bind(batch.id, batch.user_id).first<any>();
+    const [device, readings, activityCtx] = await Promise.all([
+      db.prepare(
+        "SELECT id FROM devices WHERE batch_id = ? AND user_id = ? LIMIT 1"
+      ).bind(batch.id, batch.user_id).first<any>(),
 
-    const readings = await db.prepare(
-      "SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? ORDER BY source_timestamp ASC LIMIT 200"
-    ).bind(batch.id).all<any>();
+      db.prepare(
+        "SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? ORDER BY source_timestamp ASC LIMIT 200"
+      ).bind(batch.id).all<any>(),
+
+      fetchWinemakingActivityContext(db, batch.id, batch.user_id),
+    ]);
 
     const ctx: BatchAlertContext = {
       batchId: batch.id,
@@ -32,32 +36,7 @@ export async function evaluateAllBatches(
     const candidates = evaluateAlerts(ctx);
 
     // ── Timeline-driven alerts ──────────────────────────────────────
-    const [so2Data, rackingData, mlfInoculation] = await Promise.all([
-      db.prepare(
-        `SELECT COUNT(*) as count, MAX(recorded_at) as last_at FROM activities
-         WHERE batch_id = ? AND user_id = ? AND type = 'addition'
-         AND json_extract(details, '$.chemical') IN ('K2S2O5', 'SO2', 'Campden', 'K-meta', 'Potassium metabisulfite')`,
-      ).bind(batch.id, batch.user_id).first<any>(),
-
-      db.prepare(
-        `SELECT COUNT(*) as count, MAX(recorded_at) as last_at FROM activities
-         WHERE batch_id = ? AND user_id = ? AND type = 'racking'`,
-      ).bind(batch.id, batch.user_id).first<any>(),
-
-      db.prepare(
-        `SELECT recorded_at FROM activities
-         WHERE batch_id = ? AND user_id = ? AND type = 'addition'
-         AND json_extract(details, '$.chemical') IN ('MLB', 'Leuconostoc', 'CH16', 'VP41', 'malolactic')
-         ORDER BY recorded_at ASC LIMIT 1`,
-      ).bind(batch.id, batch.user_id).first<any>(),
-    ]);
-
-    const rackingCount: number = rackingData?.count ?? 0;
-    const lastRackingAt = rackingData?.last_at ? String(rackingData.last_at).slice(0, 10) : null;
-    const lastSo2At = so2Data?.last_at ? String(so2Data.last_at).slice(0, 10) : null;
-    const mlfInoculatedAt = mlfInoculation?.recorded_at
-      ? String(mlfInoculation.recorded_at).slice(0, 10)
-      : null;
+    const { rackingCount, lastRackingAt, lastSo2At, mlfInoculatedAt } = activityCtx;
 
     const now = Date.now();
     const daysSinceLastSo2 = lastSo2At
@@ -67,23 +46,7 @@ export async function evaluateAllBatches(
       ? Math.floor((now - new Date(lastRackingAt + "T00:00:00Z").getTime()) / 86400_000)
       : null;
 
-    // Compute velocity for timeline projection
-    let velocityPerDay: number | null = null;
-    if (readings.results.length >= 2) {
-      const sorted = [...readings.results].sort(
-        (a: any, b: any) =>
-          new Date(a.source_timestamp).getTime() - new Date(b.source_timestamp).getTime(),
-      );
-      const oldest = sorted[0];
-      const newest = sorted[sorted.length - 1];
-      const timeDiffDays =
-        (new Date(newest.source_timestamp).getTime() -
-          new Date(oldest.source_timestamp).getTime()) /
-        86400_000;
-      if (timeDiffDays > 0) {
-        velocityPerDay = (newest.gravity - oldest.gravity) / timeDiffDays;
-      }
-    }
+    const velocityPerDay = computeVelocityPerDay(readings.results);
 
     const startedDate = typeof batch.started_at === "string"
       ? batch.started_at.slice(0, 10)
@@ -112,7 +75,6 @@ export async function evaluateAllBatches(
     const estimatedBottlingDate = bottlingMilestone?.estimated_date ?? null;
 
     const timelineCandidates = evaluateTimelineAlerts({
-      batchId: batch.id,
       batchName: batch.name,
       rackingCount,
       lastRackingAt,

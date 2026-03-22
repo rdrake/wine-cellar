@@ -394,7 +394,7 @@ export default function BatchDetail() {
 
           {/* Nudges — actionable suggestions for active batches */}
           {batch.status === "active" && batch.nudges && batch.nudges.length > 0 && (
-            <NudgeBar nudges={batch.nudges} />
+            <NudgeBar nudges={batch.nudges} batchId={batch.id} />
           )}
 
           {/* 3. Readings chart — hero visual */}

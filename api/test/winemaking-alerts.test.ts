@@ -6,7 +6,6 @@ import {
 
 function makeContext(overrides: Partial<TimelineAlertContext> = {}): TimelineAlertContext {
   return {
-    batchId: "batch-1",
     batchName: "Cab Sav 2025",
     rackingCount: 0,
     lastRackingAt: null,

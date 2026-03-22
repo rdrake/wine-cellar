@@ -19,7 +19,6 @@ export interface DrinkWindow {
   adjustmentNote: string | null;
 }
 
-/** Add `months` to an ISO date string and return a new ISO date string. */
 export function addMonths(date: string, months: number): string {
   const d = new Date(date + "T00:00:00Z");
   d.setUTCMonth(d.getUTCMonth() + months);

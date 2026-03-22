@@ -9,27 +9,29 @@ const PRIORITY_STYLES = {
   info: "border-l-4 border-l-muted-foreground/30",
 };
 
-const DISMISSED_KEY = "dismissed-nudges";
+function dismissedKey(batchId: string) {
+  return `dismissed-nudges-${batchId}`;
+}
 
-function getDismissed(): Set<string> {
+function getDismissed(batchId: string): Set<string> {
   try {
-    return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || "[]"));
+    return new Set(JSON.parse(localStorage.getItem(dismissedKey(batchId)) || "[]"));
   } catch { return new Set(); }
 }
 
-function dismiss(id: string) {
-  const dismissed = getDismissed();
+function dismiss(batchId: string, id: string) {
+  const dismissed = getDismissed(batchId);
   dismissed.add(id);
-  localStorage.setItem(DISMISSED_KEY, JSON.stringify([...dismissed]));
+  localStorage.setItem(dismissedKey(batchId), JSON.stringify([...dismissed]));
 }
 
-export default function NudgeBar({ nudges }: { nudges: Nudge[] }) {
-  const [dismissed, setDismissed] = useState(getDismissed);
+export default function NudgeBar({ nudges, batchId }: { nudges: Nudge[]; batchId: string }) {
+  const [dismissed, setDismissed] = useState(() => getDismissed(batchId));
   const visible = nudges.filter((n) => !dismissed.has(n.id));
   if (visible.length === 0) return null;
 
   function handleDismiss(id: string) {
-    dismiss(id);
+    dismiss(batchId, id);
     setDismissed(new Set(dismissed).add(id));
   }
 

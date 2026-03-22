@@ -4,7 +4,7 @@ import { BatchCreateSchema, BatchUpdateSchema, StageSetSchema } from "../models"
 import { notFound, conflict, validationError } from "../lib/errors";
 import { nowUtc } from "../lib/time";
 import { WAYPOINT_ORDER } from "../schema";
-import { generateNudges, projectTimeline, calculateDrinkWindow } from "../lib/winemaking";
+import { generateNudges, projectTimeline, calculateDrinkWindow, fetchWinemakingActivityContext, computeVelocityPerDay } from "../lib/winemaking";
 
 const batches = new Hono<AppEnv>();
 
@@ -108,45 +108,15 @@ batches.get("/:batchId", async (c) => {
   }
 
   // Gather context data for nudges and timeline
-  const [latestReading, so2Data, rackingData, mlfInoculation, recentReadings] = await Promise.all([
-    db.prepare("SELECT gravity, temperature FROM readings WHERE batch_id = ? ORDER BY source_timestamp DESC LIMIT 1")
-      .bind(batchId).first<any>(),
-
-    db.prepare(
-      `SELECT COUNT(*) as count, MAX(recorded_at) as last_at FROM activities
-       WHERE batch_id = ? AND user_id = ? AND type = 'addition'
-       AND json_extract(details, '$.chemical') IN ('K2S2O5', 'SO2', 'Campden', 'K-meta', 'Potassium metabisulfite')`
-    ).bind(batchId, userId).first<any>(),
-
-    db.prepare(
-      `SELECT COUNT(*) as count, MAX(recorded_at) as last_at FROM activities
-       WHERE batch_id = ? AND user_id = ? AND type = 'racking'`
-    ).bind(batchId, userId).first<any>(),
-
-    db.prepare(
-      `SELECT recorded_at FROM activities
-       WHERE batch_id = ? AND user_id = ? AND type = 'addition'
-       AND json_extract(details, '$.chemical') IN ('MLB', 'Leuconostoc', 'CH16', 'VP41', 'malolactic')
-       ORDER BY recorded_at ASC LIMIT 1`
-    ).bind(batchId, userId).first<any>(),
-
-    db.prepare("SELECT gravity, source_timestamp FROM readings WHERE batch_id = ? ORDER BY source_timestamp DESC LIMIT 10")
+  const [activityCtx, recentReadings] = await Promise.all([
+    fetchWinemakingActivityContext(db, batchId, userId),
+    db.prepare("SELECT gravity, temperature, source_timestamp FROM readings WHERE batch_id = ? ORDER BY source_timestamp DESC LIMIT 10")
       .bind(batchId).all<any>(),
   ]);
 
-  // Compute velocity from recent readings
-  let velocityPerDay: number | null = null;
   const readings = recentReadings.results;
-  if (readings.length >= 2) {
-    const newest = readings[0];
-    const oldest = readings[readings.length - 1];
-    const gravityDiff = newest.gravity - oldest.gravity;
-    const timeDiffMs = new Date(newest.source_timestamp).getTime() - new Date(oldest.source_timestamp).getTime();
-    const timeDiffDays = timeDiffMs / (1000 * 60 * 60 * 24);
-    if (timeDiffDays > 0) {
-      velocityPerDay = gravityDiff / timeDiffDays;
-    }
-  }
+  const latestReading = readings[0] ?? null;
+  const velocityPerDay = computeVelocityPerDay([...readings].reverse());
 
   const nudges = generateNudges({
     stage: row.stage,
@@ -156,15 +126,11 @@ batches.get("/:batchId", async (c) => {
     mlfStatus: row.mlf_status,
     latestGravity: latestReading?.gravity ?? null,
     latestTemp: latestReading?.temperature ?? null,
-    totalSo2Additions: so2Data?.count ?? 0,
-    lastSo2AddedAt: so2Data?.last_at ?? null,
-    hasRackingActivity: (rackingData?.count ?? 0) > 0,
+    totalSo2Additions: activityCtx.so2Count,
   });
 
   // addDays expects YYYY-MM-DD; DB timestamps may include time portion
   const startedDate = typeof row.started_at === "string" ? row.started_at.slice(0, 10) : row.started_at;
-  const lastRackingDate = rackingData?.last_at ? String(rackingData.last_at).slice(0, 10) : null;
-  const mlfDate = mlfInoculation?.recorded_at ? String(mlfInoculation.recorded_at).slice(0, 10) : null;
 
   const timeline = projectTimeline({
     stage: row.stage,
@@ -175,9 +141,9 @@ batches.get("/:batchId", async (c) => {
     velocityPerDay,
     latestGravity: latestReading?.gravity ?? null,
     targetGravity: row.target_gravity,
-    rackingCount: rackingData?.count ?? 0,
-    lastRackingAt: lastRackingDate,
-    mlfInoculatedAt: mlfDate,
+    rackingCount: activityCtx.rackingCount,
+    lastRackingAt: activityCtx.lastRackingAt,
+    mlfInoculatedAt: activityCtx.mlfInoculatedAt,
   });
 
   return c.json({ ...row, nudges, timeline });

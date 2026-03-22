@@ -14,8 +14,6 @@ function makeContext(overrides: Partial<NudgeContext> = {}): NudgeContext {
     latestGravity: null,
     latestTemp: null,
     totalSo2Additions: 0,
-    lastSo2AddedAt: null,
-    hasRackingActivity: false,
     ...overrides,
   };
 }
