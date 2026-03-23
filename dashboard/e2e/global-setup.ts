@@ -1,6 +1,6 @@
 import { request } from "@playwright/test";
+import { seed } from "./fixtures/seed";
 
-// Use the dashboard proxy so the session cookie is set for the correct origin
 const API_BASE = "http://localhost:5173";
 const STORAGE_STATE_PATH = "e2e/.auth/session.json";
 
@@ -14,6 +14,7 @@ async function globalSetup() {
 
   const ctx = await request.newContext({ baseURL: API_BASE });
 
+  // Authenticate
   const res = await ctx.post("/api/v1/auth/login/api-key", {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
@@ -21,7 +22,12 @@ async function globalSetup() {
     throw new Error(`API key login failed: ${res.status()} ${await res.text()}`);
   }
 
+  // Save auth state
   await ctx.storageState({ path: STORAGE_STATE_PATH });
+
+  // Seed test data (idempotent — skips if already seeded)
+  await seed(ctx);
+
   await ctx.dispose();
 }
 

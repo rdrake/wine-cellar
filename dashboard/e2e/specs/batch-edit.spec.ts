@@ -21,14 +21,17 @@ test.describe("Batch editing", () => {
 
     await page.getByRole("button", { name: "Create Batch" }).click();
 
-    // Step 2: Capture batch ID from the detail page URL
-    await expect(page).toHaveURL(/\/batches\/[a-zA-Z0-9-]+$/);
-    const batchId = page.url().match(/\/batches\/([a-zA-Z0-9-]+)$/)![1];
+    // Step 2: Capture batch ID from the detail page URL (UUID contains digits, "new" does not)
+    await expect(page).toHaveURL(/\/batches\/[0-9a-f]{8}-/);
+    const batchId = page.url().match(/\/batches\/([0-9a-f-]+)$/)![1];
 
-    // Step 3: Navigate to the edit page
-    await page.goto(`/batches/${batchId}/edit`);
+    // Step 3: Wait for the batch detail page to fully load before navigating to edit
+    await expect(page.getByRole("heading", { name: originalName })).toBeVisible();
 
-    // Step 4: Verify edit page heading (allow time for batch data to load)
+    // Step 4: Navigate to the edit page via the Edit link (avoids direct navigation race)
+    await page.getByRole("link", { name: "Edit" }).click();
+
+    // Step 5: Verify edit page heading (allow time for batch data to load)
     await expect(page.getByRole("heading", { name: "Edit Batch" })).toBeVisible({ timeout: 10_000 });
 
     // Step 5: Change the name

@@ -1,7 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
-  testDir: "./e2e",
+  testDir: "./e2e/specs",
   globalSetup: "./e2e/global-setup.ts",
   fullyParallel: true,
   workers: process.env.CI ? 2 : 3,
@@ -15,10 +15,10 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "cd ../api && npm run dev",
+      command: "cd ../api && bash scripts/reset-e2e-db.sh && npm run dev",
       port: 8787,
       reuseExistingServer: !process.env.CI,
-      timeout: 30_000,
+      timeout: 60_000,
     },
     {
       command: "npm run dev",

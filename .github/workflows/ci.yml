@@ -85,7 +85,6 @@ jobs:
             'WEBHOOK_TOKEN=ci-test-token' \
             'GITHUB_CLIENT_SECRET=unused-in-e2e' \
             > api/.dev.vars
-      - run: bash api/scripts/seed-e2e.sh
       - run: npx playwright test
         working-directory: dashboard
       - uses: actions/upload-artifact@v4
