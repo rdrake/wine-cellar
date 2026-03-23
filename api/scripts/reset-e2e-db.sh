@@ -12,7 +12,7 @@ rm -rf .wrangler/state/v3/d1/
 
 echo "Applying migrations..."
 for f in migrations/*.sql; do
-  npx wrangler d1 execute "$DB" --local --file "$f" 2>/dev/null
+  npx wrangler d1 execute "$DB" --local --file "$f" >/dev/null 2>/dev/null
 done
 
 # Deterministic API key for E2E tests (not secret — local/CI only)
@@ -26,6 +26,6 @@ npx wrangler d1 execute "$DB" --local --command "
 
   INSERT OR REPLACE INTO api_keys (id, user_id, name, prefix)
   VALUES ('${HASH}', '00000000-e2e0-test-0000-000000000000', 'E2E Testing', 'wc-e2ete');
-" 2>/dev/null
+" >/dev/null 2>/dev/null
 
 echo "Done. E2E_API_KEY=${E2E_KEY}"
