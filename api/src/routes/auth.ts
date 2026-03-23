@@ -23,7 +23,7 @@ import {
 } from "../lib/auth-session";
 import { base64UrlEncode, base64UrlDecode } from "../lib/encoding";
 import { forbidden, unauthorized, notFound } from "../lib/errors";
-import { createApiKey, listApiKeys, deleteApiKey } from "../lib/api-keys";
+import { createApiKey, listApiKeys, deleteApiKey, validateApiKey } from "../lib/api-keys";
 
 const auth = new Hono<AppEnv>();
 
@@ -339,6 +339,25 @@ auth.post("/login", async (c) => {
   // Create session and set cookie
   const secure = c.env.RP_ORIGIN.startsWith("https://");
   const { token } = await createSession(db, storedCred.user_id);
+  setSessionCookie(c, token, secure);
+
+  return c.json({ status: "ok" });
+});
+
+// POST /login/api-key — exchange a valid API key for a session cookie
+auth.post("/login/api-key", async (c) => {
+  const authHeader = c.req.header("Authorization");
+  if (!authHeader?.startsWith("Bearer wc-")) {
+    return unauthorized("Missing or invalid Authorization header");
+  }
+  const key = authHeader.slice(7);
+  const userId = await validateApiKey(c.env.DB, key);
+  if (!userId) {
+    return unauthorized("Invalid API key");
+  }
+
+  const secure = c.env.RP_ORIGIN.startsWith("https://");
+  const { token } = await createSession(c.env.DB, userId);
   setSessionCookie(c, token, secure);
 
   return c.json({ status: "ok" });

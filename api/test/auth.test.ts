@@ -608,3 +608,46 @@ describe("auth cron cleanup", () => {
 
 // Import SELF for redirect tests
 import { SELF } from "cloudflare:test";
+
+describe("API key login", () => {
+  it("exchanges valid API key for session cookie", async () => {
+    const { userId } = await seedSession();
+    const { createApiKey } = await import("../src/lib/api-keys");
+    const { key } = await createApiKey(env.DB, userId, "Login Test");
+
+    const res = await SELF.fetch("https://localhost/api/v1/auth/login/api-key", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json() as { status: string };
+    expect(json.status).toBe("ok");
+
+    const setCookie = res.headers.get("set-cookie");
+    expect(setCookie).toBeTruthy();
+    expect(setCookie).toContain("session=");
+
+    // Extract session cookie and use it to access a protected endpoint
+    const cookie = setCookie!.split(";")[0];
+    const { status, json: batchesJson } = await fetchJson("/api/v1/batches", {
+      headers: { Cookie: cookie },
+    });
+    expect(status).toBe(200);
+    expect(batchesJson.items).toBeDefined();
+  });
+
+  it("returns 401 for invalid API key", async () => {
+    const res = await SELF.fetch("https://localhost/api/v1/auth/login/api-key", {
+      method: "POST",
+      headers: { Authorization: "Bearer wc-0000000000000000000000000000000000000000000000000000000000000000" },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 without Authorization header", async () => {
+    const res = await SELF.fetch("https://localhost/api/v1/auth/login/api-key", {
+      method: "POST",
+    });
+    expect(res.status).toBe(401);
+  });
+});
