@@ -88,3 +88,11 @@ jobs:
       - run: bash api/scripts/seed-e2e.sh
       - run: npx playwright test
         working-directory: dashboard
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: |
+            dashboard/test-results/
+            dashboard/playwright-report/
+          retention-days: 7

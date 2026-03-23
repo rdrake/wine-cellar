@@ -69,21 +69,25 @@ function BatchSnapshot({ batch, readings, device }: {
         {/* Current readings — the freshest data first */}
         {latest ? (
           <>
-            <div className="flex justify-between items-baseline">
-              <span className="text-xs text-muted-foreground">Current SG</span>
-              <span className="text-sm font-semibold tabular-nums">
-                {sg!.toFixed(3)}
-                <span className="text-xs font-normal text-muted-foreground ml-1.5">
-                  {relativeTime(latest.source_timestamp)} · {latest.source}
+            {sg != null && (
+              <div className="flex justify-between items-baseline">
+                <span className="text-xs text-muted-foreground">Current SG</span>
+                <span className="text-sm font-semibold tabular-nums">
+                  {sg.toFixed(3)}
+                  <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                    {relativeTime(latest.source_timestamp)} · {latest.source}
+                  </span>
                 </span>
-              </span>
-            </div>
+              </div>
+            )}
             {latest.temperature != null && (
               <Stat label="Temperature" value={latest.temperature.toFixed(1)} unit={"\u00B0C"} />
             )}
             {currentAbv != null && <Stat label="Est. ABV" value={currentAbv.toFixed(1)} unit="%" />}
             {att != null && <Stat label="Attenuation" value={att.toFixed(0)} unit="%" />}
-            <Stat label={"OG \u2192 SG"} value={`${og!.toFixed(3)} \u2192 ${sg!.toFixed(3)}`} />
+            {og != null && sg != null && (
+              <Stat label={"OG \u2192 SG"} value={`${og.toFixed(3)} \u2192 ${sg.toFixed(3)}`} />
+            )}
             {vel !== null && (
               <Stat
                 label="Gravity change (48h)"

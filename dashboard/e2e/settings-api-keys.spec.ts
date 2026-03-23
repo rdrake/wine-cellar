@@ -6,8 +6,8 @@ test.describe("Settings — API Keys", () => {
 
     await page.goto("/settings");
 
-    // Verify the API Keys section is visible
-    await expect(page.getByRole("heading", { name: "API Keys" })).toBeVisible();
+    // Verify the API Keys section is visible ("API Keys" is a <p>, not a heading)
+    await expect(page.getByText("API Keys")).toBeVisible();
     await expect(page.getByText("For MCP servers and automation.")).toBeVisible();
 
     // Click the "Create" button in the section (not the dialog one)

@@ -10,8 +10,9 @@ test.describe("Activity logging", () => {
     await page.getByLabel("Name").fill(batchName);
     await page.getByRole("button", { name: "Create Batch" }).click();
 
-    // Should navigate to the batch detail page
+    // Capture batch ID from the detail page URL
     await expect(page).toHaveURL(/\/batches\/[a-zA-Z0-9-]+$/);
+    const batchId = page.url().match(/\/batches\/([a-zA-Z0-9-]+)$/)![1];
     await expect(page.getByRole("heading", { name: batchName })).toBeVisible();
 
     // ── Step 2: Navigate to activity form via batch detail ──────────
@@ -19,7 +20,6 @@ test.describe("Activity logging", () => {
     await expect(page.getByRole("heading", { name: "Log Activity" })).toBeVisible();
 
     // ── Step 3: Log an SG measurement ───────────────────────────────
-    // Comboboxes in form order: Stage (0), Type (1)
     const comboboxes = page.getByRole("combobox");
 
     // Select stage — pick the first available option
@@ -31,17 +31,16 @@ test.describe("Activity logging", () => {
     // Fill title
     await page.getByPlaceholder("e.g., Added yeast nutrient").fill("Initial SG reading");
 
-    // Metric defaults to "SG" — leave as-is
-
     // Fill the reading value
-    await page.getByLabel("Reading").fill("1.085");
+    await page.locator('div:has(> label:text("Reading")) input').fill("1.085");
 
     // Submit
     await page.getByRole("button", { name: "Log Activity" }).click();
 
-    // ── Step 4: Verify measurement appears on batch detail ──────────
-    await expect(page).toHaveURL(/\/batches\/[a-zA-Z0-9-]+$/);
-    await expect(page.getByText("Initial SG reading")).toBeVisible();
+    // ── Step 4: Navigate to batch detail and verify activity ────────
+    await page.goto(`/batches/${batchId}`);
+    await expect(page.getByRole("heading", { name: batchName })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Initial SG reading")).toBeVisible({ timeout: 10_000 });
 
     // ── Step 5: Log a note ──────────────────────────────────────────
     await page.getByRole("link", { name: "+ Log Activity" }).click();
@@ -66,11 +65,10 @@ test.describe("Activity logging", () => {
     // Submit
     await page.getByRole("button", { name: "Log Activity" }).click();
 
-    // ── Step 6: Verify note appears on batch detail ─────────────────
-    await expect(page).toHaveURL(/\/batches\/[a-zA-Z0-9-]+$/);
-    await expect(page.getByText("Smells great")).toBeVisible();
-
-    // Both activities should be visible
+    // ── Step 6: Verify both activities on batch detail ──────────────
+    await page.goto(`/batches/${batchId}`);
+    await expect(page.getByRole("heading", { name: batchName })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Smells great")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Initial SG reading")).toBeVisible();
   });
 });

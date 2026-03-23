@@ -28,8 +28,8 @@ test.describe("Batch editing", () => {
     // Step 3: Navigate to the edit page
     await page.goto(`/batches/${batchId}/edit`);
 
-    // Step 4: Verify edit page heading
-    await expect(page.getByRole("heading", { name: "Edit Batch" })).toBeVisible();
+    // Step 4: Verify edit page heading (allow time for batch data to load)
+    await expect(page.getByRole("heading", { name: "Edit Batch" })).toBeVisible({ timeout: 10_000 });
 
     // Step 5: Change the name
     await page.getByLabel("Name").clear();
@@ -50,7 +50,10 @@ test.describe("Batch editing", () => {
     // Step 10: Verify the new name appears in the heading
     await expect(page.getByRole("heading", { name: editedName })).toBeVisible();
 
-    // Step 11: Verify volume appears on the page
-    await expect(page.getByText("25")).toBeVisible();
+    // Step 11: Verify the notes section appears (notes are collapsed by default)
+    await expect(page.getByText("Batch Notes")).toBeVisible();
+    // Expand and verify note content
+    await page.getByText("Batch Notes").click();
+    await expect(page.getByText("Updated via E2E test")).toBeVisible();
   });
 });

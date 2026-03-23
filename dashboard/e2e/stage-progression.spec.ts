@@ -35,13 +35,10 @@ test.describe("Stage progression", () => {
     // Click "Set Stage" button
     await page.getByRole("button", { name: "Set Stage" }).click();
 
-    // Wait for the page to reflect the updated stage
-    // The "Set Stage" button should become disabled since selected matches current
-    await expect(
-      page.getByRole("button", { name: "Set Stage" })
-    ).toBeDisabled();
+    // Verify the success toast appears
+    await expect(page.getByText("Stage set to Secondary Fermentation")).toBeVisible();
 
-    // Verify "Secondary Fermentation" is now displayed on the page
-    await expect(page.getByText("Secondary Fermentation")).toBeVisible();
+    // Verify the snapshot section now shows "Secondary Fermentation"
+    await expect(page.locator("span.text-muted-foreground", { hasText: "Secondary Fermentation" })).toBeVisible();
   });
 });
