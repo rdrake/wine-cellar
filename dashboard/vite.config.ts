@@ -10,4 +10,11 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      "/api": "http://localhost:8787",
+      "/webhook": "http://localhost:8787",
+      "/health": "http://localhost:8787",
+    },
+  },
 });

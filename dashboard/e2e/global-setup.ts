@@ -1,6 +1,7 @@
 import { request } from "@playwright/test";
 
-const API_BASE = "http://localhost:8787";
+// Use the dashboard proxy so the session cookie is set for the correct origin
+const API_BASE = "http://localhost:5173";
 const STORAGE_STATE_PATH = "e2e/.auth/session.json";
 
 async function globalSetup() {

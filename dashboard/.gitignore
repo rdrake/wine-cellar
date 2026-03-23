@@ -23,5 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# Playwright auth state
+# Playwright
 e2e/.auth/
+test-results/
