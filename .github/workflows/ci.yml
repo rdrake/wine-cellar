@@ -56,3 +56,35 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  e2e-test:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    env:
+      E2E_API_KEY: wc-e2etest0000000000000000000000000000000000000000000000000000000000
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            dashboard/package-lock.json
+      - run: npm ci
+        working-directory: api
+      - run: npm ci
+        working-directory: dashboard
+      - run: npx playwright install chromium --with-deps
+        working-directory: dashboard
+      - name: Create API dev vars for local testing
+        run: |
+          printf '%s\n' \
+            'RP_ORIGIN=http://localhost:5173' \
+            'RP_ID=localhost' \
+            'WEBHOOK_TOKEN=ci-test-token' \
+            'GITHUB_CLIENT_SECRET=unused-in-e2e' \
+            > api/.dev.vars
+      - run: bash api/scripts/seed-e2e.sh
+      - run: npx playwright test
+        working-directory: dashboard
