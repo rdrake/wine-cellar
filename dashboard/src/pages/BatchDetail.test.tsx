@@ -286,4 +286,18 @@ describe("BatchDetail page", () => {
 
     expect(await screen.findByRole("button", { name: "Set Stage" })).toBeInTheDocument();
   });
+
+  it("shows device battery and signal strength", async () => {
+    const readings = [
+      makeReading({ id: "r1", gravity: 1.050, source_timestamp: "2026-03-18T12:00:00Z" }),
+      makeReading({ id: "r2", gravity: 1.040, source_timestamp: "2026-03-20T12:00:00Z" }),
+    ];
+    mockReadingsList.mockResolvedValue({ items: readings, next_cursor: null });
+
+    renderBatchDetail();
+    await screen.findByText("2026 Merlot");
+
+    expect(screen.getByText("90% bat")).toBeInTheDocument();
+    expect(screen.getByText("Good")).toBeInTheDocument(); // rssi -55 → "Good"
+  });
 });

@@ -30,6 +30,7 @@ import BatchTimeline from "@/components/BatchTimeline";
 import CellaringCard from "@/components/CellaringCard";
 import { abv, attenuation, velocity, tempStats, daysSince, projectedDaysToTarget } from "@/lib/fermentation";
 import { relativeTime } from "@/lib/dates";
+import { batteryColor, signalLabel } from "@/components/settings/helpers";
 
 // ── Snapshot Card ────────────────────────────────────────────────────
 
@@ -82,6 +83,18 @@ function BatchSnapshot({ batch, readings, device }: {
             )}
             {latest.temperature != null && (
               <Stat label="Temperature" value={latest.temperature.toFixed(1)} unit={"\u00B0C"} />
+            )}
+            {latest.battery != null && (
+              <div className="flex items-center gap-3 text-xs">
+                <span className={batteryColor(latest.battery)}>
+                  {latest.battery.toFixed(0)}% bat
+                </span>
+                {latest.rssi != null && (
+                  <span className={signalLabel(latest.rssi).color}>
+                    {signalLabel(latest.rssi).text}
+                  </span>
+                )}
+              </div>
             )}
             {currentAbv != null && <Stat label="Est. ABV" value={currentAbv.toFixed(1)} unit="%" />}
             {att != null && <Stat label="Attenuation" value={att.toFixed(0)} unit="%" />}
