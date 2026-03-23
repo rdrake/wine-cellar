@@ -243,6 +243,66 @@ describe("winemaking intelligence on batch detail", () => {
   });
 });
 
+describe("POST /api/v1/batches/:batchId/clone", () => {
+  it("clones a batch with recipe fields", async () => {
+    const batchId = await createBatch({
+      name: "Original Merlot",
+      wine_type: "red",
+      source_material: "fresh_grapes",
+      volume_liters: 60,
+      target_volume_liters: 55,
+      target_gravity: 0.996,
+      yeast_strain: "Lalvin BM45",
+      oak_type: "french",
+      oak_format: "chips",
+      oak_duration_days: 90,
+      mlf_status: "pending",
+      notes: "Backyard grapes",
+    });
+
+    const { status, json } = await fetchJson(
+      `/api/v1/batches/${batchId}/clone`,
+      { method: "POST", headers: await authHeaders() }
+    );
+
+    expect(status).toBe(201);
+    expect(json.id).not.toBe(batchId);
+    expect(json.name).toBe("Original Merlot (Copy)");
+    expect(json.wine_type).toBe("red");
+    expect(json.source_material).toBe("fresh_grapes");
+    expect(json.volume_liters).toBe(60);
+    expect(json.target_volume_liters).toBe(55);
+    expect(json.target_gravity).toBe(0.996);
+    expect(json.yeast_strain).toBe("Lalvin BM45");
+    expect(json.oak_type).toBe("french");
+    expect(json.oak_format).toBe("chips");
+    expect(json.oak_duration_days).toBe(90);
+    expect(json.mlf_status).toBe("pending");
+    expect(json.notes).toBe("Backyard grapes");
+    expect(json.stage).toBe("must_prep");
+    expect(json.status).toBe("active");
+    expect(json.completed_at).toBeNull();
+    expect(json.bottled_at).toBeNull();
+  });
+
+  it("returns 404 for nonexistent batch", async () => {
+    const { status } = await fetchJson(
+      "/api/v1/batches/nonexistent/clone",
+      { method: "POST", headers: await authHeaders() }
+    );
+    expect(status).toBe(404);
+  });
+
+  it("rejects cloning another user's batch", async () => {
+    const batchId = await createBatch({}, "owner@test.local");
+    const { status } = await fetchJson(
+      `/api/v1/batches/${batchId}/clone`,
+      { method: "POST", headers: await authHeaders("other@test.local") }
+    );
+    expect(status).toBe(404);
+  });
+});
+
 describe("cellaring intelligence", () => {
   it("returns cellaring data for bottled batch", async () => {
     const id = await createBatch({ wine_type: "red", source_material: "fresh_grapes" });

@@ -369,4 +369,42 @@ batches.post("/:batchId/unarchive", async (c) => {
   return c.json(await getOwnedBatch(db, batchId, c.get("user").id));
 });
 
+batches.post("/:batchId/clone", async (c) => {
+  const user = c.get("user");
+  const { batchId } = c.req.param();
+
+  const source = await getOwnedBatch(c.env.DB, batchId, user.id);
+  if (!source) return notFound("Batch");
+
+  const id = crypto.randomUUID();
+  const now = nowUtc();
+  const clonedName = `${source.name} (Copy)`.slice(0, 200);
+
+  await c.env.DB.prepare(
+    `INSERT INTO batches (id, user_id, name, wine_type, source_material,
+       volume_liters, target_volume_liters, target_gravity, yeast_strain,
+       oak_type, oak_format, oak_duration_days, mlf_status, notes,
+       stage, status, started_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'must_prep', 'active', ?, ?, ?)`
+  )
+    .bind(
+      id, user.id, clonedName,
+      source.wine_type, source.source_material,
+      source.volume_liters, source.target_volume_liters,
+      source.target_gravity, source.yeast_strain,
+      source.oak_type, source.oak_format,
+      source.oak_duration_days, source.mlf_status,
+      source.notes, now, now, now
+    )
+    .run();
+
+  const batch = await c.env.DB.prepare(
+    "SELECT * FROM batches WHERE id = ?"
+  )
+    .bind(id)
+    .first();
+
+  return c.json(batch, 201);
+});
+
 export default batches;
