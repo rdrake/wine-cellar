@@ -1,4 +1,6 @@
-.PHONY: docs docs-serve docs-deploy
+E2E_API_KEY := wc-e2etest0000000000000000000000000000000000000000000000000000000000
+
+.PHONY: docs docs-serve docs-deploy seed-e2e test-e2e test-api test-dashboard test
 
 docs:
 	uvx --with mkdocs-material==9.6.14 mkdocs build --strict --clean
@@ -8,3 +10,19 @@ docs-serve:
 
 docs-deploy: docs
 	npx wrangler pages deploy site --project-name wine-cellar-docs --commit-dirty=true
+
+## Testing
+
+test-api:
+	cd api && npm test
+
+test-dashboard:
+	cd dashboard && npm test
+
+seed-e2e:
+	bash api/scripts/seed-e2e.sh
+
+test-e2e: seed-e2e
+	cd dashboard && E2E_API_KEY=$(E2E_API_KEY) npx playwright test
+
+test: test-api test-dashboard test-e2e
