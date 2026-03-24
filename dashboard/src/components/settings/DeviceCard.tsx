@@ -1,6 +1,7 @@
 import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { GravitySparkline, BatterySparkline, RssiSparkline } from "@/components/Sparkline";
 import { timeAgo } from "@/lib/dates";
 import { batteryColor, signalLabel } from "./helpers";
@@ -16,7 +17,7 @@ export interface DeviceCardProps {
 }
 
 export function DeviceCard({ device, batchName, onAssign, onUnassign }: DeviceCardProps) {
-  const { data } = useFetch(
+  const { data, loading } = useFetch(
     () => api.readings.listByDevice(device.id, { limit: 50 }),
     [device.id],
   );
@@ -56,72 +57,83 @@ export function DeviceCard({ device, batchName, onAssign, onUnassign }: DeviceCa
           </p>
         )}
 
-        {latest ? (
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            <span className="tabular-nums">
-              <span className="font-semibold">{latest.gravity.toFixed(3)}</span>
-              <span className="text-muted-foreground"> SG</span>
-            </span>
-            {latest.temperature != null && (
-              <span className="tabular-nums">
-                <span className="font-semibold">{latest.temperature.toFixed(1)}</span>
-                <span className="text-muted-foreground">{"\u00B0C"}</span>
-              </span>
-            )}
-            {latest.battery != null && (
-              <span className={batteryColor(latest.battery)}>
-                {latest.battery.toFixed(0)}% bat
-              </span>
-            )}
-            {latest.rssi != null && (
-              <span className={signalLabel(latest.rssi).color}>
-                {signalLabel(latest.rssi).text}
-              </span>
-            )}
-            <span className="text-muted-foreground">
-              {timeAgo(latest.source_timestamp)}
-            </span>
+        {loading && !data && (
+          <div className="mt-2 flex flex-col gap-2">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-6 w-[200px]" />
           </div>
-        ) : (
-          <p className="text-xs text-muted-foreground mt-2">No readings received yet</p>
         )}
 
-        {readings.length >= 2 && (
-          <div className="mt-2">
-            <GravitySparkline values={readings.map((r) => r.gravity)} width={200} height={24} />
-            {readings.some((r) => r.battery != null) && (
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] text-muted-foreground w-6">Bat</span>
-                <BatterySparkline
-                  values={readings.filter((r) => r.battery != null).map((r) => r.battery!)}
-                  width={160}
-                  height={16}
-                />
+        {data && (
+          <>
+            {latest ? (
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className="tabular-nums">
+                  <span className="font-semibold">{latest.gravity.toFixed(3)}</span>
+                  <span className="text-muted-foreground"> SG</span>
+                </span>
+                {latest.temperature != null && (
+                  <span className="tabular-nums">
+                    <span className="font-semibold">{latest.temperature.toFixed(1)}</span>
+                    <span className="text-muted-foreground">{"\u00B0C"}</span>
+                  </span>
+                )}
+                {latest.battery != null && (
+                  <span className={batteryColor(latest.battery)}>
+                    {latest.battery.toFixed(0)}% bat
+                  </span>
+                )}
+                {latest.rssi != null && (
+                  <span className={signalLabel(latest.rssi).color}>
+                    {signalLabel(latest.rssi).text}
+                  </span>
+                )}
+                <span className="text-muted-foreground">
+                  {timeAgo(latest.source_timestamp)}
+                </span>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-2">No readings received yet</p>
+            )}
+
+            {readings.length >= 2 && (
+              <div className="mt-2">
+                <GravitySparkline values={readings.map((r) => r.gravity)} width={200} height={24} />
+                {readings.some((r) => r.battery != null) && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[10px] text-muted-foreground w-6">Bat</span>
+                    <BatterySparkline
+                      values={readings.filter((r) => r.battery != null).map((r) => r.battery!)}
+                      width={160}
+                      height={16}
+                    />
+                  </div>
+                )}
+                {readings.some((r) => r.rssi != null) && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[10px] text-muted-foreground w-6">Sig</span>
+                    <RssiSparkline
+                      values={readings.filter((r) => r.rssi != null).map((r) => r.rssi!)}
+                      width={160}
+                      height={16}
+                    />
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-xs mt-1"
+                  onClick={() => {
+                    const slug = device.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+                    downloadCSV(deviceReadingsToCSV(readings), `${slug}-readings.csv`);
+                    toast.success(`Downloaded ${readings.length} readings`);
+                  }}
+                >
+                  Export CSV
+                </Button>
               </div>
             )}
-            {readings.some((r) => r.rssi != null) && (
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] text-muted-foreground w-6">Sig</span>
-                <RssiSparkline
-                  values={readings.filter((r) => r.rssi != null).map((r) => r.rssi!)}
-                  width={160}
-                  height={16}
-                />
-              </div>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 text-xs mt-1"
-              onClick={() => {
-                const slug = device.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-                downloadCSV(deviceReadingsToCSV(readings), `${slug}-readings.csv`);
-                toast.success(`Downloaded ${readings.length} readings`);
-              }}
-            >
-              Export CSV
-            </Button>
-          </div>
+          </>
         )}
     </div>
   );
