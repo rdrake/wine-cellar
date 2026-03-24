@@ -76,5 +76,5 @@ export function TemperatureSparkline({ values, className, ...props }: Omit<Spark
 
 /** Convenience: battery sparkline with fixed 0-100 domain, green color */
 export function BatterySparkline({ values, className, ...props }: Omit<SparklineProps, "domain" | "color"> & { values: number[] }) {
-  return <Sparkline values={values} domain={[0, 100]} className={`text-green-600 ${className ?? ""}`} {...props} />;
+  return <Sparkline values={values} domain={[0, 100]} className={`text-green-600 dark:text-green-400 ${className ?? ""}`} {...props} />;
 }
