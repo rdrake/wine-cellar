@@ -211,11 +211,11 @@ export async function seed(ctx: APIRequestContext): Promise<void> {
       const values = chunk
         .map(
           (r) =>
-            `('${esc(r.id)}', '${esc(batchId)}', '${esc(deviceId)}', '${esc(E2E_USER_ID)}', ${r.gravity}, ${r.temperature}, 'device', '${esc(r.timestamp)}', '${esc(r.timestamp)}')`,
+            `('${esc(r.id)}', '${esc(batchId)}', '${esc(deviceId)}', '${esc(E2E_USER_ID)}', ${r.gravity}, ${r.temperature}, ${r.battery}, ${r.rssi}, 'device', '${esc(r.timestamp)}', '${esc(r.timestamp)}')`,
         )
         .join(",\n");
       sqlStatements.push(
-        `INSERT INTO readings (id, batch_id, device_id, user_id, gravity, temperature, source, source_timestamp, created_at) VALUES\n${values};`,
+        `INSERT INTO readings (id, batch_id, device_id, user_id, gravity, temperature, battery, rssi, source, source_timestamp, created_at) VALUES\n${values};`,
       );
     }
   }

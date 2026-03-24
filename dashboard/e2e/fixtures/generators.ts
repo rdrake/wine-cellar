@@ -16,6 +16,8 @@ export interface ReadingRow {
   id: string;
   gravity: number;
   temperature: number;
+  battery: number;
+  rssi: number;
   timestamp: string; // ISO 8601
 }
 
@@ -116,10 +118,19 @@ export function generateFermentationCurve(params: CurveParams): ReadingRow[] {
 
     const timestamp = new Date(startTime.getTime() + hoursElapsed * 60 * 60 * 1000);
 
+    // Battery: starts at 100%, drains ~0.1%/day
+    const batteryDrain = (hoursElapsed / 24) * 0.1;
+    const battery = Math.max(10, 100 - batteryDrain + gaussian(rng, 0, 0.2));
+
+    // RSSI: WiFi signal around -60 dBm with variance
+    const rssi = gaussian(rng, -60, 5);
+
     readings.push({
       id: randomUUID(),
       gravity: Math.round(gravity * 10000) / 10000,
       temperature: Math.round(temp * 100) / 100,
+      battery: Math.round(Math.min(100, Math.max(0, battery)) * 10) / 10,
+      rssi: Math.round(Math.max(-100, Math.min(-20, rssi))),
       timestamp: timestamp.toISOString(),
     });
   }
