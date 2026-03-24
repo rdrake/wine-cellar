@@ -78,3 +78,8 @@ export function TemperatureSparkline({ values, className, ...props }: Omit<Spark
 export function BatterySparkline({ values, className, ...props }: Omit<SparklineProps, "domain" | "color"> & { values: number[] }) {
   return <Sparkline values={values} domain={[0, 100]} className={`text-green-600 dark:text-green-400 ${className ?? ""}`} {...props} />;
 }
+
+/** Convenience: RSSI sparkline with fixed -100 to -20 domain, blue color */
+export function RssiSparkline({ values, className, ...props }: Omit<SparklineProps, "domain" | "color"> & { values: number[] }) {
+  return <Sparkline values={values} domain={[-100, -20]} className={`text-blue-600 dark:text-blue-400 ${className ?? ""}`} {...props} />;
+}
