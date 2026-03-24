@@ -40,4 +40,22 @@ test.describe("Device management (Settings page)", () => {
 
     await expect(page.getByText("Device assigned")).toBeVisible();
   });
+
+  test("shows sparkline SVGs for device with readings", async ({ page }) => {
+    // Sparklines render as <svg> elements — there should be at least one (gravity)
+    // Wait for readings to load first
+    await expect(page.getByText("SG").first()).toBeVisible();
+    // Gravity sparkline renders as inline SVG
+    await expect(page.locator("svg").first()).toBeVisible();
+  });
+
+  test("shows Export CSV button for device with readings", async ({ page }) => {
+    await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
+  });
+
+  test("shows battery and signal sparkline labels", async ({ page }) => {
+    // Use exact: true to avoid matching "95% bat" or "Assign"/"Assigned"
+    await expect(page.getByText("Bat", { exact: true })).toBeVisible();
+    await expect(page.getByText("Sig", { exact: true })).toBeVisible();
+  });
 });
