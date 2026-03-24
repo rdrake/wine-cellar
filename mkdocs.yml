@@ -47,3 +47,4 @@ nav:
       - Recording What You Did: user-guide/logging.md
       - Stages and Status: user-guide/batch-lifecycle.md
       - Compare and Export: user-guide/compare-and-export.md
+      - API Keys: user-guide/api-keys.md
