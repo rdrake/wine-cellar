@@ -73,3 +73,8 @@ export function GravitySparkline({ values, className, ...props }: Omit<Sparkline
 export function TemperatureSparkline({ values, className, ...props }: Omit<SparklineProps, "color"> & { values: number[] }) {
   return <Sparkline values={values} className={`text-chart-2 ${className ?? ""}`} {...props} />;
 }
+
+/** Convenience: battery sparkline with fixed 0-100 domain, green color */
+export function BatterySparkline({ values, className, ...props }: Omit<SparklineProps, "domain" | "color"> & { values: number[] }) {
+  return <Sparkline values={values} domain={[0, 100]} className={`text-green-600 ${className ?? ""}`} {...props} />;
+}

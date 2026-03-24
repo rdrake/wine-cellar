@@ -1,7 +1,7 @@
 import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
-import { GravitySparkline } from "@/components/Sparkline";
+import { GravitySparkline, BatterySparkline } from "@/components/Sparkline";
 import { timeAgo } from "@/lib/dates";
 import { batteryColor, signalLabel } from "./helpers";
 import { deviceReadingsToCSV, downloadCSV } from "@/lib/csv";
@@ -89,6 +89,16 @@ export function DeviceCard({ device, batchName, onAssign, onUnassign }: DeviceCa
         {readings.length >= 2 && (
           <div className="mt-2">
             <GravitySparkline values={readings.map((r) => r.gravity)} width={200} height={24} />
+            {readings.some((r) => r.battery != null) && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] text-muted-foreground w-6">Bat</span>
+                <BatterySparkline
+                  values={readings.filter((r) => r.battery != null).map((r) => r.battery!)}
+                  width={160}
+                  height={16}
+                />
+              </div>
+            )}
             <Button
               size="sm"
               variant="ghost"
