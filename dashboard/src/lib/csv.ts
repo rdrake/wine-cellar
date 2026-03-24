@@ -28,6 +28,18 @@ export function readingsToCSV(
   );
 }
 
+export function deviceReadingsToCSV(
+  readings: { source_timestamp: string; gravity: number; temperature: number | null; battery: number | null; rssi: number | null; source: string }[],
+): string {
+  const sorted = [...readings].sort(
+    (a, b) => new Date(a.source_timestamp).getTime() - new Date(b.source_timestamp).getTime(),
+  );
+  return toCSV(
+    ["Timestamp", "Gravity", "Temperature_C", "Battery_Pct", "RSSI_dBm", "Source"],
+    sorted.map((r) => [r.source_timestamp, r.gravity, r.temperature, r.battery, r.rssi, r.source]),
+  );
+}
+
 export function activitiesToCSV(
   activities: { recorded_at: string; stage: string; type: string; title: string; details: Record<string, unknown> | null }[],
 ): string {

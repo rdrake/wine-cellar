@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { GravitySparkline } from "@/components/Sparkline";
 import { timeAgo } from "@/lib/dates";
 import { batteryColor, signalLabel } from "./helpers";
+import { deviceReadingsToCSV, downloadCSV } from "@/lib/csv";
+import { toast } from "sonner";
 import type { Device, Reading } from "@/types";
 
 export interface DeviceCardProps {
@@ -87,6 +89,18 @@ export function DeviceCard({ device, batchName, onAssign, onUnassign }: DeviceCa
         {readings.length >= 2 && (
           <div className="mt-2">
             <GravitySparkline values={readings.map((r) => r.gravity)} width={200} height={24} />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 text-xs mt-1"
+              onClick={() => {
+                const slug = device.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+                downloadCSV(deviceReadingsToCSV(readings), `${slug}-readings.csv`);
+                toast.success(`Downloaded ${readings.length} readings`);
+              }}
+            >
+              Export CSV
+            </Button>
           </div>
         )}
     </div>
