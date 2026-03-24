@@ -53,7 +53,8 @@ test.describe("Tools — Winemaking Calculators", () => {
     await page.locator("#tc-temp").fill("30");
     await page.locator("#tc-cal").fill("20");
 
-    await expect(page.getByText("Corrected SG")).toBeVisible();
+    // corrected = 1.050 + 0.0025 - 0.0 = 1.0525
+    await expect(page.getByText("1.0525")).toBeVisible();
   });
 
   test("calibration solution calculator shows sugar needed", async ({ page }) => {
@@ -62,6 +63,7 @@ test.describe("Tools — Winemaking Calculators", () => {
     await page.locator("#cal-vol").fill("1");
     await page.locator("#cal-sg").fill("1.050");
 
-    await expect(page.getByText("Sugar Needed")).toBeVisible();
+    // brix = 261.3*(1 - 1/1.050) ≈ 12.44, sugar = 1050 * 0.1244 ≈ 130.7g
+    await expect(page.getByText("130.7g")).toBeVisible();
   });
 });
