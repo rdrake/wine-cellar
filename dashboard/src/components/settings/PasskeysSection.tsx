@@ -3,6 +3,7 @@ import { startRegistration } from "@simplewebauthn/browser";
 import { api } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -73,7 +74,24 @@ export function PasskeysSection() {
     setConfirmRevoke(null);
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading...</p>;
+  if (loading) return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-3 w-52 mt-1" />
+        </div>
+        <Skeleton className="h-8 w-14" />
+      </div>
+      <div className="flex items-center justify-between py-1.5">
+        <div>
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-40 mt-1" />
+        </div>
+        <Skeleton className="h-7 w-16" />
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-3">

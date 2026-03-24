@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import type { Batch, BatchStage, Reading, Device } from "@/types";
 import { STAGE_LABELS, WINE_TYPE_LABELS, SOURCE_MATERIAL_LABELS, STATUS_LABELS } from "@/types";
@@ -359,7 +360,44 @@ export default function BatchDetail() {
 
   return (
     <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
-      {loading && <p className="text-muted-foreground">Loading batch details...</p>}
+      {loading && (
+        <>
+          <div>
+            <div className="flex justify-between items-start">
+              <div>
+                <Skeleton className="h-6 w-44" />
+                <Skeleton className="h-4 w-32 mt-1" />
+              </div>
+              <Skeleton className="h-4 w-28" />
+            </div>
+            <div className="flex gap-2 mt-2">
+              <Skeleton className="h-7 w-12" />
+              <Skeleton className="h-7 w-16" />
+              <Skeleton className="h-7 w-14" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex justify-between items-baseline">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <Skeleton className="h-4 w-20 mb-2" />
+            <Skeleton className="h-72 w-full" />
+          </div>
+
+          <div className="flex gap-2">
+            <Skeleton className="h-8 w-36" />
+            <Skeleton className="h-8 w-20" />
+            <Skeleton className="h-8 w-20" />
+          </div>
+        </>
+      )}
       {error && (
         <div className="text-destructive">
           Couldn't load batch. {error}

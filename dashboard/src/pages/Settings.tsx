@@ -3,6 +3,7 @@ import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import type { Device } from "@/types";
 import {
@@ -50,7 +51,25 @@ export default function Settings() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3">
-            {loading && <p className="text-sm text-muted-foreground">Loading devices...</p>}
+            {loading && (
+              <div className="divide-y divide-border">
+                {[1, 2].map((i) => (
+                  <div key={i} className="py-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-3 w-48 mt-1" />
+                      </div>
+                      <Skeleton className="h-7 w-20" />
+                    </div>
+                    <div className="mt-2 flex flex-col gap-2">
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-6 w-[200px]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {error && (
               <div className="text-sm text-destructive">
                 <p>Couldn't load devices. {error}</p>

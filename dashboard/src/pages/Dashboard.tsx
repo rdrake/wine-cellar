@@ -8,6 +8,7 @@ import type { Alert, BatchSummary, Activity } from "@/types";
 import { attenuation } from "@/lib/fermentation";
 import { relativeTime } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 const WINE_TYPE_COLORS: Record<string, string> = {
@@ -253,7 +254,42 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 max-w-lg lg:max-w-3xl mx-auto">
-      {loading && <p className="text-sm text-muted-foreground">Loading your batches...</p>}
+      {loading && (
+        <>
+          <Skeleton className="h-5 w-48 my-2 mb-3" />
+
+          <Skeleton className="h-4 w-28 mb-2" />
+          <div className="divide-y divide-border">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="py-3">
+                <div className="flex justify-between items-baseline">
+                  <Skeleton className="h-5 w-36" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <Skeleton className="h-6 w-[140px]" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+                <Skeleton className="h-3 w-32 mt-1" />
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5">
+            <Skeleton className="h-4 w-28 mb-2" />
+            <div className="divide-y divide-border">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="py-2">
+                  <div className="flex justify-between items-baseline">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-12" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
       {error && (
         <div className="text-sm text-destructive">
           <p>Couldn't load your dashboard. {error}</p>

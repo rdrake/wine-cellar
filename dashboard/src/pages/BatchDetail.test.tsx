@@ -136,10 +136,10 @@ beforeEach(() => {
 });
 
 describe("BatchDetail page", () => {
-  it("shows loading state initially", () => {
+  it("shows loading skeleton initially", () => {
     mockBatchGet.mockReturnValue(new Promise(() => {})); // never resolves
-    renderBatchDetail();
-    expect(screen.getByText("Loading batch details...")).toBeInTheDocument();
+    const { container } = renderBatchDetail();
+    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
   it("renders batch name, wine type, stage, and status", async () => {

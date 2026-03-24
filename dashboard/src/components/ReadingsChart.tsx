@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import type { Reading, Activity } from "@/types";
 import { useChartColors } from "@/hooks/useChartColors";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 type TimeRange = "7d" | "14d" | "all";
@@ -127,7 +128,7 @@ export default function ReadingsChart({ readings, activities, batchStartedAt, lo
         )}
       </div>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
+      {loading && <Skeleton className="h-72 w-full" />}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {!loading && readings.length === 0 && (

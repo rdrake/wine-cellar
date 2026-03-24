@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { api } from "@/api";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -58,7 +59,24 @@ export function ApiKeysSection() {
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading...</p>;
+  if (loading) return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-3 w-48 mt-1" />
+        </div>
+        <Skeleton className="h-8 w-16" />
+      </div>
+      <div className="flex items-center justify-between py-1.5">
+        <div>
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-3 w-44 mt-1" />
+        </div>
+        <Skeleton className="h-7 w-16" />
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-3">

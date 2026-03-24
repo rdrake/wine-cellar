@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import type { Activity } from "@/types";
 import ActivityItem from "./ActivityItem";
@@ -57,7 +58,19 @@ export default function ActivitySection({ batchId, batchStatus, onChanged }: Pro
         )}
       </div>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading activities...</p>}
+      {loading && (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-start gap-3">
+              <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+              <div className="flex-1">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-24 mt-1" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {error && <p className="text-sm text-destructive">Couldn't load activities. {error}</p>}
       {data && data.items.length === 0 && (
         <p className="text-sm text-muted-foreground py-4 text-center">

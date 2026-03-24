@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/api";
 import { useFetch } from "@/hooks/useFetch";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
 interface Props {
@@ -33,7 +34,17 @@ export default function DeviceSection({ batchId, batchStatus, onAssignmentChange
     <section>
       <h2 className="font-semibold mb-2">Devices</h2>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
+      {loading && (
+        <div className="p-3 rounded-lg border">
+          <div className="flex items-center justify-between">
+            <div>
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-48 mt-1" />
+            </div>
+            <Skeleton className="h-8 w-20" />
+          </div>
+        </div>
+      )}
 
       {!loading && assignedDevices.length > 0 && (
         <div className="space-y-2">
