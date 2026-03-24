@@ -80,6 +80,7 @@ async function main() {
   // Create adapter and seed
   // Cast to 'any' — the adapter implements the subset of APIRequestContext that seed() uses
   const ctx = createFetchContext(cookie);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await seed(ctx as any);
 }
 
