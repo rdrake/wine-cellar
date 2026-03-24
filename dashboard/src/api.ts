@@ -80,6 +80,8 @@ export const api = {
       apiFetch<Batch>(`/api/v1/batches/${id}/archive`, { method: "POST" }),
     unarchive: (id: string) =>
       apiFetch<Batch>(`/api/v1/batches/${id}/unarchive`, { method: "POST" }),
+    clone: (id: string) =>
+      apiFetch<Batch>(`/api/v1/batches/${id}/clone`, { method: "POST" }),
   },
   activities: {
     list: (batchId: string, params?: { type?: ActivityType; stage?: AllStage }) =>

@@ -390,6 +390,22 @@ export default function BatchDetail() {
                 <Button size="sm" variant="ghost" className="h-7 text-xs">Edit</Button>
               </Link>
               <ExportButton batch={batch} />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={async () => {
+                  try {
+                    const cloned = await api.batches.clone(id!);
+                    toast.success(`Batch cloned: ${cloned.name}`);
+                    navigate(`/batches/${cloned.id}`);
+                  } catch {
+                    toast.error("Couldn't clone batch");
+                  }
+                }}
+              >
+                Clone
+              </Button>
             </div>
           </div>
 
